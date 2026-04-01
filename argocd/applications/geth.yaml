@@ -1,0 +1,43 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: geth-rpc
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/seokheejang/chain-node-infra.git
+    targetRevision: main
+    path: charts/geth
+    helm:
+      values: |
+        replicaCount: 1
+
+        config:
+          network: mainnet
+          syncMode: snap
+          cache: 4096
+
+        persistence:
+          enabled: true
+          size: 500Gi
+
+        resources:
+          requests:
+            cpu: "2"
+            memory: 8Gi
+          limits:
+            cpu: "4"
+            memory: 16Gi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ethereum
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

@@ -1,0 +1,145 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "geth.fullname" . }}
+  labels:
+    {{- include "geth.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  serviceName: {{ include "geth.fullname" . }}
+  selector:
+    matchLabels:
+      {{- include "geth.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "geth.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "geth.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: geth
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          args:
+            - --{{ .Values.config.network }}
+            - --syncmode={{ .Values.config.syncMode }}
+            - --datadir={{ .Values.config.dataDir }}
+            - --cache={{ .Values.config.cache }}
+            - --maxpeers={{ .Values.config.maxPeers }}
+            - --http
+            - --http.addr=0.0.0.0
+            - --http.port={{ .Values.service.ports.rpc }}
+            - --http.vhosts=*
+            - --ws
+            - --ws.addr=0.0.0.0
+            - --ws.port={{ .Values.service.ports.ws }}
+            - --ws.origins=*
+            {{- if .Values.metrics.enabled }}
+            - --metrics
+            - --metrics.addr=0.0.0.0
+            - --metrics.port={{ .Values.service.ports.metrics }}
+            {{- end }}
+            {{- if .Values.jwt.enabled }}
+            - --authrpc.jwtsecret=/secrets/jwt/jwt.hex
+            {{- end }}
+            {{- range .Values.config.extraArgs }}
+            - {{ . }}
+            {{- end }}
+          ports:
+            - name: rpc
+              containerPort: {{ .Values.service.ports.rpc }}
+              protocol: TCP
+            - name: ws
+              containerPort: {{ .Values.service.ports.ws }}
+              protocol: TCP
+            - name: p2p-tcp
+              containerPort: {{ .Values.service.ports.p2pTcp }}
+              protocol: TCP
+            - name: p2p-udp
+              containerPort: {{ .Values.service.ports.p2pUdp }}
+              protocol: UDP
+            {{- if .Values.metrics.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.service.ports.metrics }}
+              protocol: TCP
+            {{- end }}
+          {{- if .Values.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.livenessProbe.httpGet.path }}
+              port: {{ .Values.livenessProbe.httpGet.port }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          {{- end }}
+          {{- if .Values.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.readinessProbe.httpGet.path }}
+              port: {{ .Values.readinessProbe.httpGet.port }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.config.dataDir }}
+            {{- if .Values.jwt.enabled }}
+            - name: jwt
+              mountPath: /secrets/jwt
+              readOnly: true
+            {{- end }}
+      {{- if .Values.jwt.enabled }}
+      volumes:
+        - name: jwt
+          secret:
+            {{- if .Values.jwt.existingSecret }}
+            secretName: {{ .Values.jwt.existingSecret }}
+            {{- else }}
+            secretName: {{ include "geth.fullname" . }}-jwt
+            {{- end }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if .Values.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        {{- with .Values.persistence.annotations }}
+        annotations:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      spec:
+        accessModes:
+          {{- toYaml .Values.persistence.accessModes | nindent 10 }}
+        {{- if .Values.persistence.storageClass }}
+        storageClassName: {{ .Values.persistence.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size | quote }}
+  {{- end }}

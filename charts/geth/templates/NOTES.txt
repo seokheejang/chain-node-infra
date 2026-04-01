@@ -1,0 +1,21 @@
+Geth has been deployed!
+
+  Chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+  Network: {{ .Values.config.network }}
+  Sync Mode: {{ .Values.config.syncMode }}
+
+Access the RPC endpoint:
+
+  kubectl port-forward svc/{{ include "geth.fullname" . }} {{ .Values.service.ports.rpc }}:{{ .Values.service.ports.rpc }} -n {{ .Release.Namespace }}
+
+  Then open: http://localhost:{{ .Values.service.ports.rpc }}
+
+Check sync status:
+
+  curl -s -X POST -H "Content-Type: application/json" \
+    --data '{"jsonrpc":"2.0","method":"eth_syncing","params":[],"id":1}' \
+    http://localhost:{{ .Values.service.ports.rpc }}
+
+View logs:
+
+  kubectl logs -f sts/{{ include "geth.fullname" . }} -n {{ .Release.Namespace }}

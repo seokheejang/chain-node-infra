@@ -1,0 +1,26 @@
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*.bak
+*~
+
+# Helm
+*.tgz
+charts/*/charts/
+charts/*/Chart.lock
+
+# Terraform (future)
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+
+# Secrets
+.env
+*.pem
+*.key

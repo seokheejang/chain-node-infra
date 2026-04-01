@@ -1,0 +1,146 @@
+# -- Number of replicas
+replicaCount: 1
+
+image:
+  # -- Container image repository
+  repository: ethereum/client-go
+  # -- Container image tag
+  tag: "v1.14.12"
+  # -- Image pull policy
+  pullPolicy: IfNotPresent
+
+# -- Override the chart name
+nameOverride: ""
+# -- Override the full resource name
+fullnameOverride: ""
+
+serviceAccount:
+  # -- Create a ServiceAccount
+  create: true
+  # -- ServiceAccount name (auto-generated if empty)
+  name: ""
+  # -- Annotations to add to the ServiceAccount
+  annotations: {}
+
+service:
+  # -- Service type
+  type: ClusterIP
+  ports:
+    # -- HTTP-RPC port
+    rpc: 8545
+    # -- WebSocket-RPC port
+    ws: 8546
+    # -- P2P TCP port
+    p2pTcp: 30303
+    # -- P2P UDP port
+    p2pUdp: 30303
+    # -- Metrics port
+    metrics: 6060
+
+persistence:
+  # -- Enable persistent storage for chain data
+  enabled: true
+  # -- Storage class (empty for default)
+  storageClass: ""
+  # -- Access modes
+  accessModes:
+    - ReadWriteOnce
+  # -- Volume size
+  size: 100Gi
+  # -- Annotations for the PVC
+  annotations: {}
+
+resources:
+  requests:
+    # -- CPU request
+    cpu: "1"
+    # -- Memory request
+    memory: 4Gi
+  limits:
+    # -- CPU limit
+    cpu: "2"
+    # -- Memory limit
+    memory: 8Gi
+
+# -- Node selector for pod scheduling
+nodeSelector: {}
+
+# -- Tolerations for pod scheduling
+tolerations: []
+
+# -- Affinity rules for pod scheduling
+affinity: {}
+
+# -- Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# -- Container security context
+securityContext:
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+
+config:
+  # -- Ethereum network (mainnet, sepolia, holesky)
+  network: mainnet
+  # -- Sync mode (snap, full, light)
+  syncMode: snap
+  # -- Data directory inside the container
+  dataDir: /data/geth
+  # -- Database cache size in MB
+  cache: 4096
+  # -- Max peer count
+  maxPeers: 50
+  # -- Additional CLI arguments
+  extraArgs: []
+
+jwt:
+  # -- Enable JWT authentication for Engine API
+  enabled: false
+  # -- JWT secret (generate with: openssl rand -hex 32)
+  secret: ""
+  # -- Use existing secret for JWT
+  existingSecret: ""
+
+livenessProbe:
+  # -- Enable liveness probe
+  enabled: true
+  # -- Initial delay before probe starts
+  initialDelaySeconds: 60
+  # -- Probe interval
+  periodSeconds: 30
+  # -- Probe timeout
+  timeoutSeconds: 5
+  # -- Failure threshold
+  failureThreshold: 3
+  httpGet:
+    path: /
+    port: rpc
+
+readinessProbe:
+  # -- Enable readiness probe
+  enabled: true
+  # -- Initial delay before probe starts
+  initialDelaySeconds: 30
+  # -- Probe interval
+  periodSeconds: 10
+  # -- Probe timeout
+  timeoutSeconds: 5
+  # -- Failure threshold
+  failureThreshold: 3
+  httpGet:
+    path: /
+    port: rpc
+
+metrics:
+  # -- Enable Prometheus metrics
+  enabled: false
+  serviceMonitor:
+    # -- Create a ServiceMonitor resource
+    enabled: false
+    # -- ServiceMonitor scrape interval
+    interval: 30s
+    # -- Additional labels for the ServiceMonitor
+    additionalLabels: {}

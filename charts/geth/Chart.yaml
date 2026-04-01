@@ -1,0 +1,11 @@
+apiVersion: v2
+name: geth
+description: Helm chart for deploying go-ethereum (geth) execution layer RPC nodes on Kubernetes
+type: application
+version: 0.1.0
+appVersion: "1.14.12"
+
+dependencies:
+  - name: common
+    version: 0.1.x
+    repository: "file://../common"

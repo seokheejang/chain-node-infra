@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "geth.fullname" . }}
+  labels:
+    {{- include "geth.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "geth.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: rpc
+      port: {{ .Values.service.ports.rpc }}
+      targetPort: rpc
+      protocol: TCP
+    - name: ws
+      port: {{ .Values.service.ports.ws }}
+      targetPort: ws
+      protocol: TCP
+    - name: p2p-tcp
+      port: {{ .Values.service.ports.p2pTcp }}
+      targetPort: p2p-tcp
+      protocol: TCP
+    - name: p2p-udp
+      port: {{ .Values.service.ports.p2pUdp }}
+      targetPort: p2p-udp
+      protocol: UDP
+    {{- if .Values.metrics.enabled }}
+    - name: metrics
+      port: {{ .Values.service.ports.metrics }}
+      targetPort: metrics
+      protocol: TCP
+    {{- end }}
