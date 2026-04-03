@@ -24,28 +24,28 @@ chain-node-infra/
 
 ### Prerequisites
 
-- Helm 3.x
-- kubectl configured for your cluster
-- ArgoCD installed on the cluster
+- [Helm 3.x](https://helm.sh/docs/intro/install/)
+- [kubectl](https://kubernetes.io/docs/tasks/tools/)
+- [direnv](https://direnv.net/) (recommended) or source `.envrc` manually
 
-### Deploy a chart locally
-
-```bash
-# Update dependencies and render templates
-helm dependency update charts/geth
-helm template my-geth charts/geth
-
-# Install to cluster
-helm install my-geth charts/geth -n ethereum --create-namespace
-```
-
-### Deploy via ArgoCD
+### Environment Setup
 
 ```bash
-kubectl apply -f argocd/applications/geth.yaml
+# 1. Copy the environment template
+cp .envrc.example .envrc
+
+# 2. Edit .envrc — set KUBECONFIG to your kubeconfig path
+#    e.g.: export KUBECONFIG="${HOME}/.kube/config"
+
+# 3. Load environment variables
+direnv allow       # with direnv (auto-loads on cd / new terminal)
+source .envrc      # without direnv
+
+# 4. Verify cluster connectivity
+kubectl cluster-info
 ```
 
-## Development
+### Local Development (no cluster required)
 
 ```bash
 # Lint all changed charts
@@ -56,6 +56,28 @@ make template CHART=geth
 
 # Generate chart documentation
 make docs
+```
+
+### Deploy to Cluster
+
+```bash
+# Ensure .envrc is loaded with a valid KUBECONFIG
+
+# Update dependencies and render templates
+helm dependency update charts/geth
+helm template my-geth charts/geth
+
+# Install to cluster
+helm install my-geth charts/geth -n ethereum --create-namespace
+```
+
+### Deploy via ArgoCD
+
+See [docs/task-01-argocd-installation.md](docs/task-01-argocd-installation.md) for ArgoCD setup instructions.
+
+```bash
+# Ensure ArgoCD is installed and .envrc is loaded
+kubectl apply -f argocd/applications/geth.yaml
 ```
 
 ## Adding a New Chart

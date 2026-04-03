@@ -1,0 +1,46 @@
+# ArgoCD values for e2e testing (minimal, no TLS, low resources).
+server:
+  service:
+    type: NodePort
+    nodePortHttp: 30080
+
+configs:
+  params:
+    server.insecure: true
+
+# Disable optional components for faster startup
+dex:
+  enabled: false
+
+notifications:
+  enabled: false
+
+applicationSet:
+  enabled: false
+
+controller:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+repoServer:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+redis:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi

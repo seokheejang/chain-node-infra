@@ -1,0 +1,28 @@
+# Kind cluster configuration for e2e testing.
+# Ref: https://kind.sigs.k8s.io/docs/user/configuration/
+#
+# Topology:
+#   - control-plane: ArgoCD, cluster services
+#   - worker:        blockchain nodes (geth, lighthouse, etc.)
+#
+# Access blockchain node ports via kubectl port-forward.
+# Host requirements: Docker with 4+ CPU, 6+ GB RAM allocated.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      # ArgoCD UI (NodePort)
+      - containerPort: 30080
+        hostPort: 8080
+        protocol: TCP
+
+  - role: worker
+    labels:
+      node.kubernetes.io/role: blockchain

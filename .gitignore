@@ -20,7 +20,12 @@ charts/*/Chart.lock
 *.tfstate
 *.tfstate.backup
 
-# Secrets
+# Secrets & credentials
 .env
+.envrc
+.kubeconfig
+kubeconfig
+e2e/.kubeconfig
 *.pem
 *.key
+credentials.json

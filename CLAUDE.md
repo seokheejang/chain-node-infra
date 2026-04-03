@@ -5,6 +5,18 @@
 Helm charts and ArgoCD manifests for blockchain RPC node infrastructure on Kubernetes.
 GitOps workflow: ArgoCD + Helm (no Kustomize).
 
+**This is an open-source repository.** Anyone can clone and use it with their own cluster.
+All documentation, scripts, and examples must be written for external users, not just the maintainer.
+
+## Open-Source Execution Principles
+
+- **Cluster access is the user's responsibility**: This repo never contains kubeconfig files, SSH keys, or cluster endpoints.
+- **`.envrc.example` pattern**: Commit an env var template as `.envrc.example`. Users copy it to `.envrc` and customize. Works with direnv (auto-load on cd) or without (source manually). Scripts also source `.envrc` automatically.
+- **Scripts must respect `$KUBECONFIG`**: Never hardcode kubeconfig paths. Helm and kubectl natively follow `$KUBECONFIG`.
+- **Never write bare `kubectl apply -f ...` in docs**: Always state prerequisites (KUBECONFIG setup, namespace existence, etc.) or provide a script that handles them.
+- **Deployment scripts live under `scripts/`**: Scripts source `.envrc` automatically. Users just configure `.envrc` and run the script.
+- **Never commit real secrets, endpoints, or kubeconfig files into this repo.**
+
 ## Repository Structure
 
 - `charts/` - Helm charts (flat listing per client, plus `common/` library chart)
@@ -67,6 +79,11 @@ Every chart under `charts/` must have:
 - Values like `jwt.secret` and TLS certs in values.yaml must always be empty strings or placeholders
 - ArgoCD Application manifests must not contain real cluster endpoints or credentials
 
+## Language
+
+- **English**: Code, comments, YAML values, commit messages, README.md, CLAUDE.md, and all finalized documentation.
+- **Korean**: Task plans and work-in-progress documents (`docs/task-*.md`) — these are for the maintainer to review and make decisions.
+
 ## Commit Conventions
 
 - Use Conventional Commits: `type(scope): description`
@@ -75,9 +92,11 @@ Every chart under `charts/` must have:
 
 ## CI/CD
 
-- `ct lint` and `ct install` run on PR via GitHub Actions
-- chart-releaser packages and publishes charts on merge to main
-- The `ci/` directory inside each chart is for ct test values only, NOT for environments
+- **Every chart must pass `ct lint` and `ct install` before merge.** This is the primary verification gate — if it doesn't work in ct, it doesn't ship.
+- `ct install` runs against a Kind cluster in CI (GitHub Actions). All charts must be testable in this environment without external dependencies (no real kubeconfig, no external clusters).
+- Each chart's `ci/default-values.yaml` must contain values that allow successful installation in a Kind cluster.
+- chart-releaser packages and publishes charts on merge to main.
+- The `ci/` directory inside each chart is for ct test values only, NOT for environments.
 
 ## Development Commands
 

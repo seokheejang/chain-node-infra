@@ -1,0 +1,40 @@
+# Environment configuration for chain-node-infra
+# Copy this file to .envrc and fill in your values.
+#
+# Usage:
+#   cp .envrc.example .envrc
+#   # Edit .envrc with your settings
+#
+#   With direnv: direnv allow     (auto-loads on cd)
+#   Without:     source .envrc    (manual)
+#   Scripts also source .envrc automatically if present.
+
+# --- Kubernetes ---
+# Path to your kubeconfig file
+export KUBECONFIG="${PWD}/.kubeconfig"
+# export KUBECONFIG="${HOME}/.kube/config"
+
+# Kubernetes context to use (optional, defaults to current-context in kubeconfig)
+# export KUBE_CONTEXT="my-cluster-context"
+
+# Default namespace for operations
+# export KUBE_NAMESPACE="ethereum"
+
+# --- ArgoCD ---
+# ArgoCD server address (without https://)
+# export ARGOCD_SERVER="argocd.example.com"
+
+# ArgoCD admin credentials (used by install and e2e scripts)
+export ARGOCD_ADMIN_USER="admin"
+export ARGOCD_ADMIN_PASSWORD="admin"
+
+# ArgoCD authentication token (for CI or non-interactive use)
+# export ARGOCD_AUTH_TOKEN="<your-token>"
+
+# --- Helm ---
+# Extra Helm arguments applied to all commands
+# export HELM_EXTRA_ARGS="--timeout 600s"
+
+# --- Git ---
+# Chart repository URL (for ArgoCD Application manifests)
+# export CHART_REPO_URL="https://github.com/<your-org>/chain-node-infra.git"

@@ -1,0 +1,45 @@
+# ArgoCD Helm chart values for chain-node-infra
+# Chart: argo-cd 9.4.17 (ArgoCD v3.3.6)
+# Customize this file for your environment before running install-argocd.sh
+
+global:
+  # -- ArgoCD server domain (replace with your domain)
+  domain: argocd.example.com
+
+server:
+  service:
+    # -- Service type (ClusterIP for internal, LoadBalancer for external)
+    type: ClusterIP
+
+  ingress:
+    # -- Enable ingress (set to true and configure domain for external access)
+    enabled: false
+
+configs:
+  params:
+    # -- Set to true if TLS is terminated at the load balancer / ingress
+    server.insecure: false
+
+  repositories:
+    chain-node-infra:
+      # -- This repository URL (replace <your-org> with your GitHub org/user)
+      url: https://github.com/<your-org>/chain-node-infra.git
+      type: git
+
+controller:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+repoServer:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
