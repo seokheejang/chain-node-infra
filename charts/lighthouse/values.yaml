@@ -3,9 +3,9 @@ replicaCount: 1
 
 image:
   # -- Container image repository
-  repository: ethereum/client-go
+  repository: sigp/lighthouse
   # -- Container image tag
-  tag: "v1.14.12"
+  tag: "v8.1.3"
   # -- Image pull policy
   pullPolicy: IfNotPresent
 
@@ -26,21 +26,17 @@ service:
   # -- Service type
   type: ClusterIP
   ports:
-    # -- HTTP-RPC port
-    rpc: 8545
-    # -- WebSocket-RPC port
-    ws: 8546
-    # -- Engine API (authenticated RPC) port
-    authrpc: 8551
+    # -- Beacon API HTTP port
+    http: 5052
     # -- P2P TCP port
-    p2pTcp: 30303
+    p2pTcp: 9000
     # -- P2P UDP port
-    p2pUdp: 30303
+    p2pUdp: 9000
     # -- Metrics port
-    metrics: 6060
+    metrics: 5054
 
 persistence:
-  # -- Enable persistent storage for chain data
+  # -- Enable persistent storage for beacon data
   enabled: true
   # -- Storage class (empty for default)
   storageClass: ""
@@ -48,7 +44,7 @@ persistence:
   accessModes:
     - ReadWriteOnce
   # -- Volume size
-  size: 100Gi
+  size: 50Gi
   # -- Annotations for the PVC
   annotations: {}
 
@@ -57,12 +53,12 @@ resources:
     # -- CPU request
     cpu: "1"
     # -- Memory request
-    memory: 4Gi
+    memory: 2Gi
   limits:
     # -- CPU limit
     cpu: "2"
     # -- Memory limit
-    memory: 8Gi
+    memory: 4Gi
 
 # -- Node selector for pod scheduling
 nodeSelector: {}
@@ -86,49 +82,56 @@ securityContext:
 
 config:
   # -- Ethereum network (mainnet, sepolia, holesky, private)
-  # When set to "private", the --networkid flag is used instead of --<network>
+  # When set to "private", --testnet-dir and --private flags are used
   network: mainnet
-  # -- Custom network ID for private networks (e.g., 32382)
-  # Only used when config.network is "private"
-  networkId: ""
-  # -- Sync mode (snap, full, light)
-  syncMode: snap
   # -- Data directory inside the container
-  dataDir: /data/geth
-  # -- Database cache size in MB
-  cache: 4096
-  # -- Max peer count
-  maxPeers: 50
-  # -- Bootnode enode URLs for private network peer discovery
-  bootnodes: []
+  dataDir: /data/lighthouse
+  # -- Execution layer Engine API endpoint URL
+  executionEndpoint: "http://geth:8551"
+  # -- Number of slots per restore point (controls disk usage)
+  slotsPerRestorePoint: 8192
   # -- Additional CLI arguments
   extraArgs: []
 
-genesis:
-  # -- Enable genesis.json ConfigMap and geth init InitContainer
+# -- Custom testnet directory configuration (for private/custom networks)
+testnetDir:
+  # -- Enable custom testnet directory
   enabled: false
-  # -- Genesis configuration content (YAML, rendered to JSON)
+  # -- CL config.yaml content (as YAML)
   # Example for private PoS network:
-  #   config:
-  #     chainId: 32382
-  #     homesteadBlock: 0
-  #     terminalTotalDifficulty: 0
-  #     terminalTotalDifficultyPassed: true
-  #   alloc:
-  #     "0xYourAddress":
-  #       balance: "0x200000000000000000000000000000000000000000000000000000000000000"
-  #   difficulty: "0x1"
-  #   gasLimit: "0x1c9c380"
+  #   PRESET_BASE: mainnet
+  #   MIN_GENESIS_ACTIVE_VALIDATOR_COUNT: 1
+  #   MIN_GENESIS_TIME: 0
+  #   GENESIS_DELAY: 0
+  #   SECONDS_PER_SLOT: 12
   config: {}
-  # -- Use existing ConfigMap for genesis.json instead of creating one
+  # -- Execution block number at which the beacon chain was deployed
+  deployBlock: "0"
+  # -- Validator mnemonics for genesis generation (as YAML list)
+  # Example:
+  #   - mnemonic: "test test test test test test test test test test test junk"
+  #     count: 1
+  mnemonics: []
+  # -- Use existing ConfigMap for testnet-dir files
   existingConfigMap: ""
 
-jwt:
-  # -- Enable JWT authentication for Engine API
+# -- Genesis SSZ generator InitContainer configuration
+genesisGenerator:
+  # -- Enable InitContainer to auto-generate genesis.ssz
   enabled: false
-  # -- JWT secret (generate with: openssl rand -hex 32)
+  # -- Generator image repository
+  image: ethpandaops/ethereum-genesis-generator
+  # -- Generator image tag
+  tag: "v5.3.5"
+  # -- Name of the geth genesis ConfigMap to reference for EL genesis
+  elGenesisConfigMap: ""
+
+jwt:
+  # -- Enable JWT authentication (required for Engine API)
+  enabled: false
+  # -- JWT secret value (generate with: openssl rand -hex 32)
   secret: ""
-  # -- Use existing secret for JWT
+  # -- Use existing secret for JWT (shared with EL)
   existingSecret: ""
 
 livenessProbe:
@@ -143,8 +146,8 @@ livenessProbe:
   # -- Failure threshold
   failureThreshold: 3
   httpGet:
-    path: /
-    port: rpc
+    path: /lighthouse/health
+    port: http
 
 readinessProbe:
   # -- Enable readiness probe
@@ -158,8 +161,8 @@ readinessProbe:
   # -- Failure threshold
   failureThreshold: 3
   httpGet:
-    path: /
-    port: rpc
+    path: /lighthouse/health
+    port: http
 
 ingress:
   # -- Ingress type: "none", "ingress", or "httpRoute"
@@ -174,9 +177,9 @@ ingress:
     annotations: {}
     # -- TLS configuration
     tls: []
-    #  - secretName: geth-tls
+    #  - secretName: lighthouse-tls
     #    hosts:
-    #      - geth-rpc.example.com
+    #      - lighthouse-api.example.com
   # -- Gateway API HTTPRoute configuration (e.g., Cilium Gateway)
   httpRoute:
     # -- Name of the parent Gateway resource

@@ -1,0 +1,23 @@
+Lighthouse has been deployed!
+
+  Chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+  Network: {{ .Values.config.network }}
+  Execution Endpoint: {{ .Values.config.executionEndpoint }}
+
+Access the Beacon API:
+
+  kubectl port-forward svc/{{ include "lighthouse.fullname" . }} {{ .Values.service.ports.http }}:{{ .Values.service.ports.http }} -n {{ .Release.Namespace }}
+
+  Then open: http://localhost:{{ .Values.service.ports.http }}
+
+Check node health:
+
+  curl -s http://localhost:{{ .Values.service.ports.http }}/lighthouse/health
+
+Check sync status:
+
+  curl -s http://localhost:{{ .Values.service.ports.http }}/lighthouse/syncing
+
+View logs:
+
+  kubectl logs -f sts/{{ include "lighthouse.fullname" . }} -n {{ .Release.Namespace }}

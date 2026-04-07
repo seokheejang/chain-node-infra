@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: geth-rpc
+  name: lighthouse-private
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -10,13 +10,13 @@ spec:
   source:
     repoURL: https://github.com/seokheejang/chain-node-infra.git
     targetRevision: main
-    path: charts/geth
+    path: charts/lighthouse
     helm:
       valueFiles:
-        - ../../environments/mainnet/geth.yaml
+        - ../../environments/private/lighthouse.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: ethereum
+    namespace: ethereum-private
   syncPolicy:
     automated:
       prune: true

@@ -3,12 +3,24 @@ Geth has been deployed!
   Chart: {{ .Chart.Name }}-{{ .Chart.Version }}
   Network: {{ .Values.config.network }}
   Sync Mode: {{ .Values.config.syncMode }}
+{{- if eq .Values.config.network "private" }}
+  Network ID: {{ .Values.config.networkId }}
+  {{- if .Values.genesis.enabled }}
+  Genesis: Initialized via ConfigMap
+  {{- end }}
+{{- end }}
 
 Access the RPC endpoint:
 
   kubectl port-forward svc/{{ include "geth.fullname" . }} {{ .Values.service.ports.rpc }}:{{ .Values.service.ports.rpc }} -n {{ .Release.Namespace }}
 
   Then open: http://localhost:{{ .Values.service.ports.rpc }}
+{{- if .Values.jwt.enabled }}
+
+Engine API endpoint (for CL connection):
+
+  http://{{ include "geth.fullname" . }}:{{ .Values.service.ports.authrpc }}
+{{- end }}
 
 Check sync status:
 

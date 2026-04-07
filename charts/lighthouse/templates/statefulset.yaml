@@ -1,29 +1,29 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "geth.fullname" . }}
+  name: {{ include "lighthouse.fullname" . }}
   labels:
-    {{- include "geth.labels" . | nindent 4 }}
+    {{- include "lighthouse.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
-  serviceName: {{ include "geth.fullname" . }}
+  serviceName: {{ include "lighthouse.fullname" . }}
   selector:
     matchLabels:
-      {{- include "geth.selectorLabels" . | nindent 6 }}
+      {{- include "lighthouse.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "geth.labels" . | nindent 8 }}
+        {{- include "lighthouse.labels" . | nindent 8 }}
     spec:
-      serviceAccountName: {{ include "geth.serviceAccountName" . }}
+      serviceAccountName: {{ include "lighthouse.serviceAccountName" . }}
       {{- with .Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if .Values.genesis.enabled }}
+      {{- if .Values.genesisGenerator.enabled }}
       initContainers:
-        - name: geth-init
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        - name: generate-genesis-ssz
+          image: "{{ .Values.genesisGenerator.image }}:{{ .Values.genesisGenerator.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
             allowPrivilegeEscalation: false
@@ -31,21 +31,34 @@ spec:
             - sh
             - -c
             - |
-              if [ ! -d {{ .Values.config.dataDir }}/geth/chaindata ]; then
-                echo "Initializing genesis..."
-                geth init --datadir {{ .Values.config.dataDir }} /config/genesis.json
-              else
-                echo "Chain data already exists, skipping init."
+              if [ -f /data/testnet/genesis.ssz ]; then
+                echo "genesis.ssz already exists, skipping generation."
+                exit 0
               fi
+              mkdir -p /data/testnet
+              echo "Generating genesis.ssz from EL genesis and CL config..."
+              cp /config/testnet/config.yaml /data/testnet/config.yaml
+              cp /config/testnet/deploy_block /data/testnet/deploy_block
+              eth2-testnet-genesis bellatrix \
+                --config /config/testnet/config.yaml \
+                --mnemonics /config/testnet/mnemonics.yaml \
+                --el-config /config/el-genesis/genesis.json \
+                --state-output /data/testnet/genesis.ssz
+              echo "genesis.ssz generated successfully."
           volumeMounts:
-            - name: data
-              mountPath: {{ .Values.config.dataDir }}
-            - name: genesis
-              mountPath: /config
+            - name: testnet-generated
+              mountPath: /data/testnet
+            {{- if .Values.genesisGenerator.elGenesisConfigMap }}
+            - name: el-genesis
+              mountPath: /config/el-genesis
+              readOnly: true
+            {{- end }}
+            - name: testnet-config
+              mountPath: /config/testnet
               readOnly: true
       {{- end }}
       containers:
-        - name: geth
+        - name: lighthouse
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- with .Values.securityContext }}
@@ -53,52 +66,43 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           args:
+            - beacon_node
             {{- if ne .Values.config.network "private" }}
-            - --{{ .Values.config.network }}
-            {{- else }}
-            - --networkid={{ .Values.config.networkId }}
+            - --network={{ .Values.config.network }}
             {{- end }}
-            - --syncmode={{ .Values.config.syncMode }}
+            {{- if or .Values.testnetDir.enabled .Values.genesisGenerator.enabled }}
+            {{- if .Values.genesisGenerator.enabled }}
+            - --testnet-dir=/data/testnet
+            {{- else }}
+            - --testnet-dir=/config/testnet
+            {{- end }}
+            {{- end }}
             - --datadir={{ .Values.config.dataDir }}
-            - --cache={{ .Values.config.cache }}
-            - --maxpeers={{ .Values.config.maxPeers }}
+            - --execution-endpoint={{ .Values.config.executionEndpoint }}
+            {{- if .Values.jwt.enabled }}
+            - --execution-jwt=/secrets/jwt/jwt.hex
+            {{- end }}
             - --http
-            - --http.addr=0.0.0.0
-            - --http.port={{ .Values.service.ports.rpc }}
-            - --http.vhosts=*
-            - --ws
-            - --ws.addr=0.0.0.0
-            - --ws.port={{ .Values.service.ports.ws }}
-            - --ws.origins=*
+            - --http-address=0.0.0.0
+            - --http-port={{ .Values.service.ports.http }}
+            - --http-allow-origin=*
+            - --port={{ .Values.service.ports.p2pTcp }}
+            - --slots-per-restore-point={{ .Values.config.slotsPerRestorePoint }}
             {{- if .Values.metrics.enabled }}
             - --metrics
-            - --metrics.addr=0.0.0.0
-            - --metrics.port={{ .Values.service.ports.metrics }}
+            - --metrics-address=0.0.0.0
+            - --metrics-port={{ .Values.service.ports.metrics }}
             {{- end }}
-            {{- if .Values.jwt.enabled }}
-            - --authrpc.jwtsecret=/secrets/jwt/jwt.hex
-            - --authrpc.addr=0.0.0.0
-            - --authrpc.port={{ .Values.service.ports.authrpc }}
-            - --authrpc.vhosts=*
-            {{- end }}
-            {{- if .Values.config.bootnodes }}
-            - --bootnodes={{ join "," .Values.config.bootnodes }}
+            {{- if eq .Values.config.network "private" }}
+            - --private
             {{- end }}
             {{- range .Values.config.extraArgs }}
             - {{ . }}
             {{- end }}
           ports:
-            - name: rpc
-              containerPort: {{ .Values.service.ports.rpc }}
+            - name: http
+              containerPort: {{ .Values.service.ports.http }}
               protocol: TCP
-            - name: ws
-              containerPort: {{ .Values.service.ports.ws }}
-              protocol: TCP
-            {{- if .Values.jwt.enabled }}
-            - name: authrpc
-              containerPort: {{ .Values.service.ports.authrpc }}
-              protocol: TCP
-            {{- end }}
             - name: p2p-tcp
               containerPort: {{ .Values.service.ports.p2pTcp }}
               protocol: TCP
@@ -142,7 +146,16 @@ spec:
               mountPath: /secrets/jwt
               readOnly: true
             {{- end }}
-      {{- if or .Values.jwt.enabled .Values.genesis.enabled }}
+            {{- if .Values.genesisGenerator.enabled }}
+            - name: testnet-generated
+              mountPath: /data/testnet
+              readOnly: true
+            {{- else if .Values.testnetDir.enabled }}
+            - name: testnet-config
+              mountPath: /config/testnet
+              readOnly: true
+            {{- end }}
+      {{- if or .Values.jwt.enabled .Values.testnetDir.enabled .Values.genesisGenerator.enabled }}
       volumes:
         {{- if .Values.jwt.enabled }}
         - name: jwt
@@ -150,17 +163,26 @@ spec:
             {{- if .Values.jwt.existingSecret }}
             secretName: {{ .Values.jwt.existingSecret }}
             {{- else }}
-            secretName: {{ include "geth.fullname" . }}-jwt
+            secretName: {{ include "lighthouse.fullname" . }}-jwt
             {{- end }}
         {{- end }}
-        {{- if .Values.genesis.enabled }}
-        - name: genesis
+        {{- if or .Values.testnetDir.enabled .Values.genesisGenerator.enabled }}
+        - name: testnet-config
           configMap:
-            {{- if .Values.genesis.existingConfigMap }}
-            name: {{ .Values.genesis.existingConfigMap }}
+            {{- if .Values.testnetDir.existingConfigMap }}
+            name: {{ .Values.testnetDir.existingConfigMap }}
             {{- else }}
-            name: {{ include "geth.fullname" . }}-genesis
+            name: {{ include "lighthouse.fullname" . }}-testnet
             {{- end }}
+        {{- end }}
+        {{- if .Values.genesisGenerator.enabled }}
+        - name: testnet-generated
+          emptyDir: {}
+        {{- if .Values.genesisGenerator.elGenesisConfigMap }}
+        - name: el-genesis
+          configMap:
+            name: {{ .Values.genesisGenerator.elGenesisConfigMap }}
+        {{- end }}
         {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}

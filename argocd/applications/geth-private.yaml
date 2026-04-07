@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: geth-rpc
+  name: geth-private
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -13,10 +13,10 @@ spec:
     path: charts/geth
     helm:
       valueFiles:
-        - ../../environments/mainnet/geth.yaml
+        - ../../environments/private/geth.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: ethereum
+    namespace: ethereum-private
   syncPolicy:
     automated:
       prune: true

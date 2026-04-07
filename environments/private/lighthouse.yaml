@@ -1,0 +1,55 @@
+# Private network (devnet) values for lighthouse
+replicaCount: 1
+
+config:
+  network: private
+  dataDir: /data/lighthouse
+  executionEndpoint: "http://geth-private:8551"
+
+testnetDir:
+  enabled: true
+  config:
+    PRESET_BASE: mainnet
+    MIN_GENESIS_ACTIVE_VALIDATOR_COUNT: 1
+    MIN_GENESIS_TIME: 0
+    GENESIS_DELAY: 0
+    SECONDS_PER_SLOT: 12
+    SECONDS_PER_ETH1_BLOCK: 12
+    ETH1_FOLLOW_DISTANCE: 1
+    DEPOSIT_CHAIN_ID: 32382
+    DEPOSIT_NETWORK_ID: 32382
+    DEPOSIT_CONTRACT_ADDRESS: "0x4242424242424242424242424242424242424242"
+    ALTAIR_FORK_EPOCH: 0
+    BELLATRIX_FORK_EPOCH: 0
+    CAPELLA_FORK_EPOCH: 0
+    DENEB_FORK_EPOCH: 0
+    TERMINAL_TOTAL_DIFFICULTY: 0
+  deployBlock: "0"
+  mnemonics:
+    - mnemonic: "test test test test test test test test test test test junk"
+      count: 1
+
+genesisGenerator:
+  enabled: true
+  image: ethpandaops/ethereum-genesis-generator
+  tag: "v5.3.5"
+  elGenesisConfigMap: geth-private-genesis
+
+jwt:
+  enabled: true
+  existingSecret: ethereum-jwt
+
+persistence:
+  enabled: true
+  size: 5Gi
+
+resources:
+  requests:
+    cpu: "1"
+    memory: 1Gi
+  limits:
+    cpu: "2"
+    memory: 2Gi
+
+metrics:
+  enabled: true

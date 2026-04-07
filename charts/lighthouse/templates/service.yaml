@@ -1,28 +1,18 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "geth.fullname" . }}
+  name: {{ include "lighthouse.fullname" . }}
   labels:
-    {{- include "geth.labels" . | nindent 4 }}
+    {{- include "lighthouse.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
   selector:
-    {{- include "geth.selectorLabels" . | nindent 4 }}
+    {{- include "lighthouse.selectorLabels" . | nindent 4 }}
   ports:
-    - name: rpc
-      port: {{ .Values.service.ports.rpc }}
-      targetPort: rpc
+    - name: http
+      port: {{ .Values.service.ports.http }}
+      targetPort: http
       protocol: TCP
-    - name: ws
-      port: {{ .Values.service.ports.ws }}
-      targetPort: ws
-      protocol: TCP
-    {{- if .Values.jwt.enabled }}
-    - name: authrpc
-      port: {{ .Values.service.ports.authrpc }}
-      targetPort: authrpc
-      protocol: TCP
-    {{- end }}
     - name: p2p-tcp
       port: {{ .Values.service.ports.p2pTcp }}
       targetPort: p2p-tcp

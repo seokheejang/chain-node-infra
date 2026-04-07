@@ -1,0 +1,19 @@
+# Mainnet values for geth
+replicaCount: 1
+
+config:
+  network: mainnet
+  syncMode: snap
+  cache: 4096
+
+persistence:
+  enabled: true
+  size: 500Gi
+
+resources:
+  requests:
+    cpu: "2"
+    memory: 8Gi
+  limits:
+    cpu: "4"
+    memory: 16Gi
