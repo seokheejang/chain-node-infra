@@ -1,0 +1,164 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "lighthouse-validator.fullname" . }}
+  labels:
+    {{- include "lighthouse-validator.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  serviceName: {{ include "lighthouse-validator.fullname" . }}
+  selector:
+    matchLabels:
+      {{- include "lighthouse-validator.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "lighthouse-validator.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "lighthouse-validator.serviceAccountName" . }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if or (and .Values.testnetDir.enabled .Values.testnetDir.fromUrls.genesisSsz) .Values.validatorKeys.fromMnemonic.enabled }}
+      initContainers:
+        {{- if and .Values.testnetDir.enabled .Values.testnetDir.fromUrls.genesisSsz }}
+        - name: download-testnet
+          image: busybox:1.37
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for genesis-generator..."
+              until wget -q --spider {{ .Values.testnetDir.fromUrls.configYaml }}; do
+                sleep 5
+              done
+              mkdir -p /testnet-download
+              wget -O /testnet-download/genesis.ssz {{ .Values.testnetDir.fromUrls.genesisSsz }}
+              wget -O /testnet-download/config.yaml {{ .Values.testnetDir.fromUrls.configYaml }}
+              echo "0" > /testnet-download/deploy_block
+              echo "0" > /testnet-download/deposit_contract_block.txt
+              echo "Testnet files downloaded."
+          volumeMounts:
+            - name: testnet-download
+              mountPath: /testnet-download
+        {{- end }}
+        {{- if .Values.validatorKeys.fromMnemonic.enabled }}
+        - name: generate-keys
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - |
+              echo "Generating validator keys from mnemonic..."
+              echo "{{ .Values.validatorKeys.fromMnemonic.mnemonic }}" > /tmp/mnemonic.txt
+              echo "" | lighthouse account validator recover \
+                --mnemonic-path /tmp/mnemonic.txt \
+                --first-index {{ .Values.validatorKeys.fromMnemonic.startIndex }} \
+                --count {{ .Values.validatorKeys.fromMnemonic.count }} \
+                --datadir {{ .Values.config.dataDir }} \
+                {{- if .Values.testnetDir.enabled }}
+                --testnet-dir /testnet-download \
+                {{- else if ne .Values.config.network "private" }}
+                --network {{ .Values.config.network }} \
+                {{- end }}
+                --stdin-inputs
+              echo "Validator keys generated."
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            {{- if .Values.testnetDir.enabled }}
+            - name: testnet-download
+              mountPath: /testnet-download
+              readOnly: true
+            {{- end }}
+        {{- end }}
+      {{- end }}
+      containers:
+        - name: lighthouse-validator
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          command:
+            - lighthouse
+          args:
+            - validator_client
+            {{- if ne .Values.config.network "private" }}
+            - --network={{ .Values.config.network }}
+            {{- end }}
+            {{- if .Values.testnetDir.enabled }}
+            - --testnet-dir=/testnet-download
+            {{- end }}
+            - --beacon-nodes={{ .Values.config.beaconNodes }}
+            - --datadir={{ .Values.config.dataDir }}
+            - --init-slashing-protection
+            {{- if .Values.config.suggestedFeeRecipient }}
+            - --suggested-fee-recipient={{ .Values.config.suggestedFeeRecipient }}
+            {{- end }}
+            {{- if .Values.metrics.enabled }}
+            - --metrics
+            - --metrics-address=0.0.0.0
+            - --metrics-port={{ .Values.service.ports.metrics }}
+            {{- end }}
+            {{- range .Values.config.extraArgs }}
+            - {{ . }}
+            {{- end }}
+          {{- if .Values.metrics.enabled }}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.service.ports.metrics }}
+              protocol: TCP
+          {{- end }}
+          {{- if and .Values.livenessProbe.enabled .Values.metrics.enabled }}
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.livenessProbe.tcpSocket.port }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          {{- end }}
+          {{- if and .Values.readinessProbe.enabled .Values.metrics.enabled }}
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.readinessProbe.tcpSocket.port }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            {{- if .Values.testnetDir.enabled }}
+            - name: testnet-download
+              mountPath: /testnet-download
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: data
+          emptyDir: {}
+        {{- if .Values.testnetDir.enabled }}
+        - name: testnet-download
+          emptyDir: {}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

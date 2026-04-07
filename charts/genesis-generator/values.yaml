@@ -19,6 +19,8 @@ chainConfig:
   PRESET_BASE: "mainnet"
   NUMBER_OF_VALIDATORS: "1"
   GENESIS_DELAY: "0"
+  # -- Genesis timestamp (auto-set to deploy time by the template)
+  GENESIS_TIMESTAMP: "0"
   SLOT_DURATION_IN_SECONDS: "12"
   MIN_GENESIS_ACTIVE_VALIDATOR_COUNT: "1"
   ALTAIR_FORK_EPOCH: "0"

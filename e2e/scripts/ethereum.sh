@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Ethereum EL-CL (geth + lighthouse) e2e test runner.
+# Ethereum EL-CL-VC (geth + lighthouse + validator) e2e test runner.
 # Prerequisite: e2e/scripts/setup.sh must have been run first.
 #
 # Usage:
@@ -18,6 +18,7 @@ NAMESPACE="ethereum-e2e"
 GENESIS_RELEASE="genesis-e2e"
 GETH_RELEASE="geth-e2e"
 LIGHTHOUSE_RELEASE="lighthouse-e2e"
+VALIDATOR_RELEASE="validator-e2e"
 JWT_SECRET_NAME="ethereum-jwt"
 E2E_KUBECONFIG="${E2E_DIR}/.kubeconfig"
 GETH_LOCAL_PORT=18545
@@ -112,14 +113,15 @@ cmd_deploy() {
     preflight
 
     echo ""
-    echo "=== Deploy Ethereum EL-CL ==="
+    echo "=== Deploy Ethereum EL-CL-VC ==="
     echo "  Namespace  : ${NAMESPACE}"
     echo "  Geth       : ${GETH_RELEASE}"
     echo "  Lighthouse : ${LIGHTHOUSE_RELEASE}"
+    echo "  Validator  : ${VALIDATOR_RELEASE}"
     echo ""
 
-    # [1/5] Namespace + JWT Secret
-    echo "[1/5] Creating namespace and JWT secret..."
+    # [1/6] Namespace + JWT Secret
+    echo "[1/6] Creating namespace and JWT secret..."
     # Wait if namespace is still terminating from previous teardown
     while kubectl get namespace "${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null | grep -q Terminating; do
         echo "  Waiting for namespace ${NAMESPACE} to finish terminating..."
@@ -131,42 +133,52 @@ cmd_deploy() {
         --from-literal=jwt.hex="${JWT_HEX}" \
         --namespace "${NAMESPACE}" \
         --dry-run=client -o yaml | kubectl apply -f -
-    echo "[1/5] Done."
+    echo "[1/6] Done."
 
-    # [2/5] Build dependencies
-    echo "[2/5] Building chart dependencies..."
+    # [2/6] Build dependencies
+    echo "[2/6] Building chart dependencies..."
     helm dependency build "${REPO_ROOT}/charts/genesis-generator" --skip-refresh 2>/dev/null
     helm dependency build "${REPO_ROOT}/charts/geth" --skip-refresh 2>/dev/null
     helm dependency build "${REPO_ROOT}/charts/lighthouse" --skip-refresh 2>/dev/null
-    echo "[2/5] Done."
+    helm dependency build "${REPO_ROOT}/charts/lighthouse-validator" --skip-refresh 2>/dev/null
+    echo "[2/6] Done."
 
-    # [3/5] Genesis generator (HTTP server)
-    echo "[3/5] Deploying genesis-generator (${GENESIS_RELEASE})..."
+    # [3/6] Genesis generator (HTTP server)
+    echo "[3/6] Deploying genesis-generator (${GENESIS_RELEASE})..."
     helm upgrade --install "${GENESIS_RELEASE}" "${REPO_ROOT}/charts/genesis-generator" \
         --namespace "${NAMESPACE}" \
         --create-namespace \
         -f "${E2E_DIR}/values/genesis-generator.yaml" \
         --timeout 5m \
         --wait
-    echo "[3/5] Done. Genesis serving at ${GENESIS_RELEASE}-genesis-generator:8000"
+    echo "[3/6] Done. Genesis serving at ${GENESIS_RELEASE}-genesis-generator:8000"
 
-    # [4/5] Deploy geth (EL)
-    echo "[4/5] Deploying geth (${GETH_RELEASE})..."
+    # [4/6] Deploy geth (EL)
+    echo "[4/6] Deploying geth (${GETH_RELEASE})..."
     helm upgrade --install "${GETH_RELEASE}" "${REPO_ROOT}/charts/geth" \
         --namespace "${NAMESPACE}" \
         -f "${E2E_DIR}/values/geth.yaml" \
         --timeout 5m \
         --wait
-    echo "[4/5] Done."
+    echo "[4/6] Done."
 
-    # [5/5] Deploy lighthouse (CL)
-    echo "[5/5] Deploying lighthouse (${LIGHTHOUSE_RELEASE})..."
+    # [5/6] Deploy lighthouse (CL)
+    echo "[5/6] Deploying lighthouse (${LIGHTHOUSE_RELEASE})..."
     helm upgrade --install "${LIGHTHOUSE_RELEASE}" "${REPO_ROOT}/charts/lighthouse" \
         --namespace "${NAMESPACE}" \
         -f "${E2E_DIR}/values/lighthouse.yaml" \
         --timeout 5m \
         --wait
-    echo "[5/5] Done."
+    echo "[5/6] Done."
+
+    # [6/6] Deploy lighthouse-validator (VC)
+    echo "[6/6] Deploying lighthouse-validator (${VALIDATOR_RELEASE})..."
+    helm upgrade --install "${VALIDATOR_RELEASE}" "${REPO_ROOT}/charts/lighthouse-validator" \
+        --namespace "${NAMESPACE}" \
+        -f "${E2E_DIR}/values/lighthouse-validator.yaml" \
+        --timeout 5m \
+        --wait
+    echo "[6/6] Done."
 
     # Verify
     echo ""
@@ -175,12 +187,13 @@ cmd_deploy() {
 
     echo ""
     echo "==========================================="
-    echo "  Ethereum EL-CL deployment ready"
+    echo "  Ethereum EL-CL-VC deployment ready"
     echo "==========================================="
     echo ""
     echo "  Namespace    : ${NAMESPACE}"
     echo "  Geth RPC     : kubectl port-forward svc/${GETH_RELEASE} 8545:8545 -n ${NAMESPACE}"
     echo "  Lighthouse   : kubectl port-forward svc/${LIGHTHOUSE_RELEASE} 5052:5052 -n ${NAMESPACE}"
+    echo "  Validator    : ${VALIDATOR_RELEASE}"
     echo ""
     echo "  Teardown     : e2e/scripts/ethereum.sh teardown"
     echo "==========================================="
@@ -196,7 +209,7 @@ cmd_verify() {
     FAIL=0
 
     echo ""
-    echo "=== Ethereum EL-CL Verification ==="
+    echo "=== Ethereum EL-CL-VC Verification ==="
     echo ""
 
     # Pod Readiness
@@ -205,6 +218,8 @@ cmd_verify() {
         "kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=${GETH_RELEASE} -n ${NAMESPACE} --timeout=10s"
     check "Lighthouse pod ready" \
         "kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=${LIGHTHOUSE_RELEASE} -n ${NAMESPACE} --timeout=10s"
+    check "Validator pod ready" \
+        "kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=${VALIDATOR_RELEASE} -n ${NAMESPACE} --timeout=10s"
 
     # Port Forwards
     echo ""
@@ -240,6 +255,15 @@ cmd_verify() {
     wait_for "Engine API connected (el_offline=false)" 90 \
         "curl -sf http://localhost:${LIGHTHOUSE_LOCAL_PORT}/eth/v1/node/syncing | grep -q '\"el_offline\":false'"
 
+    # Block Production
+    echo ""
+    echo "Block Production (Validator):"
+    wait_for "Block number > 3 (validator producing blocks)" 180 \
+        "curl -sf -X POST -H 'Content-Type: application/json' \
+            --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' \
+            http://localhost:${GETH_LOCAL_PORT} \
+            | python3 -c 'import sys,json; r=json.load(sys.stdin); sys.exit(0 if int(r[\"result\"],16)>3 else 1)'"
+
     # Cleanup port-forwards
     cleanup_pids
     trap - EXIT
@@ -255,6 +279,7 @@ cmd_verify() {
         echo "  Debug commands:"
         echo "    kubectl logs sts/${GETH_RELEASE} -n ${NAMESPACE} --tail=50"
         echo "    kubectl logs sts/${LIGHTHOUSE_RELEASE} -n ${NAMESPACE} --tail=50"
+        echo "    kubectl logs sts/${VALIDATOR_RELEASE} -n ${NAMESPACE} --tail=50"
         echo "    kubectl get pods -n ${NAMESPACE}"
         return 1
     fi
@@ -266,23 +291,26 @@ cmd_teardown() {
     preflight
 
     echo ""
-    echo "=== Teardown Ethereum EL-CL ==="
+    echo "=== Teardown Ethereum EL-CL-VC ==="
     echo ""
 
-    echo "[1/4] Uninstalling lighthouse (${LIGHTHOUSE_RELEASE})..."
+    echo "[1/5] Uninstalling lighthouse-validator (${VALIDATOR_RELEASE})..."
+    helm uninstall "${VALIDATOR_RELEASE}" --namespace "${NAMESPACE}" 2>/dev/null || echo "  (not found, skipping)"
+
+    echo "[2/5] Uninstalling lighthouse (${LIGHTHOUSE_RELEASE})..."
     helm uninstall "${LIGHTHOUSE_RELEASE}" --namespace "${NAMESPACE}" 2>/dev/null || echo "  (not found, skipping)"
 
-    echo "[2/4] Uninstalling geth (${GETH_RELEASE})..."
+    echo "[3/5] Uninstalling geth (${GETH_RELEASE})..."
     helm uninstall "${GETH_RELEASE}" --namespace "${NAMESPACE}" 2>/dev/null || echo "  (not found, skipping)"
 
-    echo "[3/4] Uninstalling genesis-generator (${GENESIS_RELEASE})..."
+    echo "[4/5] Uninstalling genesis-generator (${GENESIS_RELEASE})..."
     helm uninstall "${GENESIS_RELEASE}" --namespace "${NAMESPACE}" 2>/dev/null || echo "  (not found, skipping)"
 
-    echo "[4/4] Deleting namespace (${NAMESPACE})..."
+    echo "[5/5] Deleting namespace (${NAMESPACE})..."
     kubectl delete namespace "${NAMESPACE}" --wait=false 2>/dev/null || echo "  (not found, skipping)"
 
     echo ""
-    echo "Ethereum EL-CL teardown complete."
+    echo "Ethereum EL-CL-VC teardown complete."
     echo "To also delete the Kind cluster: e2e/scripts/cluster.sh teardown"
 }
 
@@ -304,8 +332,8 @@ case "${COMMAND}" in
         echo "Usage: $0 {deploy|verify|teardown} [--namespace <ns>]"
         echo ""
         echo "Commands:"
-        echo "  deploy     Deploy geth (EL) + lighthouse (CL) with JWT"
-        echo "  verify     Check pod health and EL-CL Engine API connection"
+        echo "  deploy     Deploy geth (EL) + lighthouse (CL) + validator (VC) with JWT"
+        echo "  verify     Check pod health, EL-CL connection, and block production"
         echo "  teardown   Uninstall releases and delete namespace"
         exit 1
         ;;

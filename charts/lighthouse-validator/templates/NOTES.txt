@@ -1,0 +1,15 @@
+Lighthouse Validator has been deployed!
+
+  Chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+  Network: {{ .Values.config.network }}
+  Beacon Nodes: {{ .Values.config.beaconNodes }}
+
+The validator client connects to the beacon node API to perform duties.
+Block production will begin once:
+  1. The beacon node is synced
+  2. The execution layer is connected
+  3. Validator keys are loaded
+
+View logs:
+
+  kubectl logs -f sts/{{ include "lighthouse-validator.fullname" . }} -n {{ .Release.Namespace }}

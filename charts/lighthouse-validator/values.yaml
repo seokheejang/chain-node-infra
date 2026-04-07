@@ -1,0 +1,136 @@
+# -- Number of replicas
+replicaCount: 1
+
+image:
+  # -- Lighthouse container image repository
+  repository: sigp/lighthouse
+  # -- Lighthouse container image tag
+  tag: "v8.1.3"
+  # -- Image pull policy
+  pullPolicy: IfNotPresent
+
+# -- Override the chart name
+nameOverride: ""
+# -- Override the full resource name
+fullnameOverride: ""
+
+serviceAccount:
+  # -- Create a ServiceAccount
+  create: true
+  # -- ServiceAccount name (auto-generated if empty)
+  name: ""
+  # -- Annotations to add to the ServiceAccount
+  annotations: {}
+
+service:
+  # -- Service type
+  type: ClusterIP
+  ports:
+    # -- Metrics port
+    metrics: 5064
+
+resources:
+  requests:
+    # -- CPU request
+    cpu: "500m"
+    # -- Memory request
+    memory: 512Mi
+  limits:
+    # -- CPU limit
+    cpu: "1"
+    # -- Memory limit
+    memory: 1Gi
+
+# -- Node selector for pod scheduling
+nodeSelector: {}
+
+# -- Tolerations for pod scheduling
+tolerations: []
+
+# -- Affinity rules for pod scheduling
+affinity: {}
+
+# -- Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# -- Container security context
+securityContext:
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+
+config:
+  # -- Ethereum network (mainnet, sepolia, holesky, private)
+  # When set to "private", --testnet-dir is used
+  network: mainnet
+  # -- Data directory inside the container
+  dataDir: /data/lighthouse-validator
+  # -- Beacon node HTTP API endpoints (comma-separated for redundancy)
+  beaconNodes: "http://lighthouse:5052"
+  # -- Suggested fee recipient address for block proposals
+  suggestedFeeRecipient: ""
+  # -- Additional CLI arguments
+  extraArgs: []
+
+# -- Custom testnet directory configuration (for private/custom networks)
+testnetDir:
+  # -- Enable custom testnet directory
+  enabled: false
+  # -- Download testnet files from HTTP URLs (e.g., genesis-generator server)
+  fromUrls:
+    genesisSsz: ""
+    configYaml: ""
+
+# -- Validator key configuration
+validatorKeys:
+  # -- Generate keys from mnemonic in initContainer (devnet only, NEVER use real mnemonic)
+  fromMnemonic:
+    # -- Enable mnemonic-based key generation
+    enabled: false
+    # -- BIP-39 mnemonic (must match genesis-generator mnemonic)
+    mnemonic: ""
+    # -- Starting validator index
+    startIndex: 0
+    # -- Number of validator keys to generate
+    count: 1
+
+livenessProbe:
+  # -- Enable liveness probe
+  enabled: true
+  # -- Initial delay before probe starts
+  initialDelaySeconds: 60
+  # -- Probe interval
+  periodSeconds: 120
+  # -- Probe timeout
+  timeoutSeconds: 5
+  # -- Failure threshold
+  failureThreshold: 3
+  tcpSocket:
+    port: metrics
+
+readinessProbe:
+  # -- Enable readiness probe
+  enabled: true
+  # -- Initial delay before probe starts
+  initialDelaySeconds: 10
+  # -- Probe interval
+  periodSeconds: 10
+  # -- Probe timeout
+  timeoutSeconds: 5
+  # -- Failure threshold
+  failureThreshold: 3
+  tcpSocket:
+    port: metrics
+
+metrics:
+  # -- Enable Prometheus metrics
+  enabled: false
+  serviceMonitor:
+    # -- Create a ServiceMonitor resource
+    enabled: false
+    # -- ServiceMonitor scrape interval
+    interval: 30s
+    # -- Additional labels for the ServiceMonitor
+    additionalLabels: {}

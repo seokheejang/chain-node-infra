@@ -7,7 +7,11 @@ metadata:
 data:
   values.env: |
     {{- range $key, $value := .Values.chainConfig }}
+    {{- if eq $key "GENESIS_TIMESTAMP" }}
+    export GENESIS_TIMESTAMP={{ now | unixEpoch | quote }}
+    {{- else }}
     export {{ $key }}={{ $value | quote }}
+    {{- end }}
     {{- end }}
   mnemonics.yaml: |
     {{- .Values.mnemonics | toYaml | nindent 4 }}

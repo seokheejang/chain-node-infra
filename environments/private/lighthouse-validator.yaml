@@ -1,0 +1,32 @@
+# Private network (devnet) values for lighthouse-validator.
+# Generates validator keys from genesis mnemonic, connects to lighthouse beacon.
+replicaCount: 1
+
+config:
+  network: private
+  dataDir: /data/lighthouse-validator
+  beaconNodes: "http://lighthouse-private:5052"
+
+testnetDir:
+  enabled: true
+  fromUrls:
+    genesisSsz: "http://genesis-generator-private-genesis-generator:8000/metadata/genesis.ssz"
+    configYaml: "http://genesis-generator-private-genesis-generator:8000/metadata/config.yaml"
+
+validatorKeys:
+  fromMnemonic:
+    enabled: true
+    mnemonic: "test test test test test test test test test test test junk"
+    startIndex: 0
+    count: 1
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+metrics:
+  enabled: true

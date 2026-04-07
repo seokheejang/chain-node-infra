@@ -1,0 +1,27 @@
+# Values for chart-testing (ct lint / ct install) in Kind cluster.
+# Uses mainnet mode without beacon node (lighthouse-validator retries connection).
+# No validator keys configured — validator starts with no duties.
+replicaCount: 1
+
+config:
+  network: mainnet
+  dataDir: /data/lighthouse-validator
+  beaconNodes: "http://localhost:5052"
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Probes disabled: no metrics port in ct mode (validator has no HTTP API)
+livenessProbe:
+  enabled: false
+
+readinessProbe:
+  enabled: false
+
+metrics:
+  enabled: false

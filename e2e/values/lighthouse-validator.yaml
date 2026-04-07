@@ -1,0 +1,50 @@
+# E2E test values for lighthouse-validator (Kind cluster, minimal resources).
+# Generates validator keys from genesis mnemonic, connects to lighthouse beacon.
+replicaCount: 1
+
+config:
+  network: private
+  dataDir: /data/lighthouse-validator
+  beaconNodes: "http://lighthouse-e2e:5052"
+
+testnetDir:
+  enabled: true
+  fromUrls:
+    genesisSsz: "http://genesis-e2e-genesis-generator:8000/metadata/genesis.ssz"
+    configYaml: "http://genesis-e2e-genesis-generator:8000/metadata/config.yaml"
+
+validatorKeys:
+  fromMnemonic:
+    enabled: true
+    mnemonic: "test test test test test test test test test test test junk"
+    startIndex: 0
+    count: 1
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+metrics:
+  enabled: true
+
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 60
+  periodSeconds: 120
+  timeoutSeconds: 5
+  failureThreshold: 10
+  tcpSocket:
+    port: metrics
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 10
+  tcpSocket:
+    port: metrics
