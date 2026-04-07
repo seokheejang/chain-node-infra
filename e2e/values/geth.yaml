@@ -1,0 +1,51 @@
+# E2E test values for geth (Kind cluster, minimal resources).
+# Genesis downloaded from genesis-generator HTTP server.
+replicaCount: 1
+
+config:
+  network: private
+  networkId: 32382
+  syncMode: full
+  cache: 256
+  maxPeers: 0
+  dataDir: /data/geth
+
+genesis:
+  enabled: true
+  fromUrl: "http://genesis-e2e-genesis-generator:8000/metadata/genesis.json"
+
+jwt:
+  enabled: true
+  existingSecret: ethereum-jwt
+
+persistence:
+  enabled: true
+  size: 1Gi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 10
+  httpGet:
+    path: /
+    port: rpc
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 10
+  httpGet:
+    path: /
+    port: rpc

@@ -20,42 +20,27 @@ spec:
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if .Values.genesisGenerator.enabled }}
+      {{- if and .Values.testnetDir.enabled .Values.testnetDir.fromUrls.genesisSsz }}
       initContainers:
-        - name: generate-genesis-ssz
-          image: "{{ .Values.genesisGenerator.image }}:{{ .Values.genesisGenerator.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          securityContext:
-            allowPrivilegeEscalation: false
+        - name: download-testnet
+          image: busybox:1.37
           command:
             - sh
             - -c
             - |
-              if [ -f /data/testnet/genesis.ssz ]; then
-                echo "genesis.ssz already exists, skipping generation."
-                exit 0
-              fi
-              mkdir -p /data/testnet
-              echo "Generating genesis.ssz from EL genesis and CL config..."
-              cp /config/testnet/config.yaml /data/testnet/config.yaml
-              cp /config/testnet/deploy_block /data/testnet/deploy_block
-              eth2-testnet-genesis bellatrix \
-                --config /config/testnet/config.yaml \
-                --mnemonics /config/testnet/mnemonics.yaml \
-                --el-config /config/el-genesis/genesis.json \
-                --state-output /data/testnet/genesis.ssz
-              echo "genesis.ssz generated successfully."
+              echo "Waiting for genesis-generator..."
+              until wget -q --spider {{ .Values.testnetDir.fromUrls.configYaml }}; do
+                sleep 5
+              done
+              mkdir -p /testnet-download
+              wget -O /testnet-download/genesis.ssz {{ .Values.testnetDir.fromUrls.genesisSsz }}
+              wget -O /testnet-download/config.yaml {{ .Values.testnetDir.fromUrls.configYaml }}
+              echo "0" > /testnet-download/deploy_block
+              echo "0" > /testnet-download/deposit_contract_block.txt
+              echo "Testnet files downloaded."
           volumeMounts:
-            - name: testnet-generated
-              mountPath: /data/testnet
-            {{- if .Values.genesisGenerator.elGenesisConfigMap }}
-            - name: el-genesis
-              mountPath: /config/el-genesis
-              readOnly: true
-            {{- end }}
-            - name: testnet-config
-              mountPath: /config/testnet
-              readOnly: true
+            - name: testnet-download
+              mountPath: /testnet-download
       {{- end }}
       containers:
         - name: lighthouse
@@ -65,14 +50,16 @@ spec:
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          command:
+            - lighthouse
           args:
             - beacon_node
             {{- if ne .Values.config.network "private" }}
             - --network={{ .Values.config.network }}
             {{- end }}
-            {{- if or .Values.testnetDir.enabled .Values.genesisGenerator.enabled }}
-            {{- if .Values.genesisGenerator.enabled }}
-            - --testnet-dir=/data/testnet
+            {{- if .Values.testnetDir.enabled }}
+            {{- if .Values.testnetDir.fromUrls.genesisSsz }}
+            - --testnet-dir=/testnet-download
             {{- else }}
             - --testnet-dir=/config/testnet
             {{- end }}
@@ -146,16 +133,16 @@ spec:
               mountPath: /secrets/jwt
               readOnly: true
             {{- end }}
-            {{- if .Values.genesisGenerator.enabled }}
-            - name: testnet-generated
-              mountPath: /data/testnet
+            {{- if and .Values.testnetDir.enabled .Values.testnetDir.fromUrls.genesisSsz }}
+            - name: testnet-download
+              mountPath: /testnet-download
               readOnly: true
             {{- else if .Values.testnetDir.enabled }}
-            - name: testnet-config
+            - name: testnet
               mountPath: /config/testnet
               readOnly: true
             {{- end }}
-      {{- if or .Values.jwt.enabled .Values.testnetDir.enabled .Values.genesisGenerator.enabled }}
+      {{- if or .Values.jwt.enabled .Values.testnetDir.enabled }}
       volumes:
         {{- if .Values.jwt.enabled }}
         - name: jwt
@@ -166,23 +153,17 @@ spec:
             secretName: {{ include "lighthouse.fullname" . }}-jwt
             {{- end }}
         {{- end }}
-        {{- if or .Values.testnetDir.enabled .Values.genesisGenerator.enabled }}
-        - name: testnet-config
+        {{- if and .Values.testnetDir.enabled .Values.testnetDir.fromUrls.genesisSsz }}
+        - name: testnet-download
+          emptyDir: {}
+        {{- else if .Values.testnetDir.enabled }}
+        - name: testnet
           configMap:
             {{- if .Values.testnetDir.existingConfigMap }}
             name: {{ .Values.testnetDir.existingConfigMap }}
             {{- else }}
             name: {{ include "lighthouse.fullname" . }}-testnet
             {{- end }}
-        {{- end }}
-        {{- if .Values.genesisGenerator.enabled }}
-        - name: testnet-generated
-          emptyDir: {}
-        {{- if .Values.genesisGenerator.elGenesisConfigMap }}
-        - name: el-genesis
-          configMap:
-            name: {{ .Values.genesisGenerator.elGenesisConfigMap }}
-        {{- end }}
         {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}

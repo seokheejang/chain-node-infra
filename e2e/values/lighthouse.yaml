@@ -1,0 +1,52 @@
+# E2E test values for lighthouse (Kind cluster, minimal resources).
+# Genesis downloaded from genesis-generator HTTP server.
+replicaCount: 1
+
+config:
+  network: private
+  dataDir: /data/lighthouse
+  executionEndpoint: "http://geth-e2e:8551"
+  extraArgs:
+    - --allow-insecure-genesis-sync
+
+testnetDir:
+  enabled: true
+  fromUrls:
+    genesisSsz: "http://genesis-e2e-genesis-generator:8000/metadata/genesis.ssz"
+    configYaml: "http://genesis-e2e-genesis-generator:8000/metadata/config.yaml"
+
+jwt:
+  enabled: true
+  existingSecret: ethereum-jwt
+
+persistence:
+  enabled: true
+  size: 1Gi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 15
+  timeoutSeconds: 5
+  failureThreshold: 10
+  httpGet:
+    path: /lighthouse/health
+    port: http
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 15
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 10
+  httpGet:
+    path: /lighthouse/health
+    port: http

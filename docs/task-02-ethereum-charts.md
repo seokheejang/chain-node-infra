@@ -17,31 +17,152 @@ Private Network → Testnet → Mainnet 순서로 점진적으로 확장한다.
 EL + CL은 **Engine API (JWT 인증)** 로 통신한다.
 **두 레이어 모두 있어야** 노드가 정상 동작한다.
 
+### Private PoS Network 구성 시 알아야 할 개념
+
+#### Genesis 파일
+
+Private network를 시작하려면 **체인의 시작 상태**(genesis)를 정의해야 한다.
+
+| 파일 | 대상 | 형식 | 내용 |
+|------|------|------|------|
+| `genesis.json` | EL (geth) | JSON | chainId, 초기 계정 잔액(alloc), EIP 활성화 블록, TTD |
+| `genesis.ssz` | CL (lighthouse) | SSZ (바이너리) | BeaconState — validator set, fork config, EL genesis 참조 |
+| `config.yaml` | CL (lighthouse) | YAML | 슬롯 시간, fork epoch, deposit contract 주소 등 CL 파라미터 |
+
+**핵심**: `genesis.json`과 `genesis.ssz`는 반드시 **동일한 소스에서 생성**되어야 한다.
+별도로 생성하면 EL genesis block hash가 불일치하여 EL-CL 통신이 실패한다.
+
+#### genesis.ssz를 직접 만들 수 없는 이유
+
+`genesis.ssz`는 SSZ(Simple Serialize) 포맷의 바이너리 파일로, 내부에 다음이 포함된다:
+- validator별 BLS public key (mnemonic에서 derive)
+- Merkle state root 계산
+- fork별 BeaconState 구조체 (Deneb ≠ Capella ≠ Bellatrix)
+- EL genesis block hash 참조
+
+이를 직접 구현하는 것은 비현실적이며, `ethpandaops/ethereum-genesis-generator` 같은 전용 도구가 필수.
+
+#### Genesis Generator
+
+[ethpandaops/ethereum-genesis-generator](https://github.com/ethpandaops/ethereum-genesis-generator) 이미지를 사용한다.
+
+- 입력: `values.env` (체인 설정), `mnemonics.yaml` (validator 키)
+- 출력: `genesis.json` (EL) + `genesis.ssz` (CL) + `config.yaml` (CL) 등
+- 내부에 python HTTP 서버를 포함하여 (`SERVER_ENABLED=true`) 생성된 아티팩트를 HTTP로 서빙
+- `genesis.ssz`가 2~3MB로 ConfigMap 크기 제한(3MB)을 초과할 수 있어 HTTP 서빙 방식이 필수
+
+#### Fork Epochs
+
+이더리움은 하드포크를 통해 프로토콜을 업그레이드한다. Private network에서는 `FORK_EPOCH: 0`으로 설정하여 genesis부터 활성화한다.
+
+| Fork | 주요 변경 | devnet 설정 |
+|------|----------|------------|
+| Altair | Light client 지원 | epoch 0 |
+| Bellatrix | The Merge (PoS 전환) | epoch 0 |
+| Capella | Validator 출금 | epoch 0 |
+| Deneb | Blob 트랜잭션 (EIP-4844) | epoch 0 |
+| Electra | 미래 | far-future (비활성화) |
+| Fulu | 미래 | far-future (비활성화) |
+
+`ELECTRA_FORK_EPOCH: "18446744073709551615"` (uint64 최대값)으로 설정하면 사실상 비활성화.
+
+#### Deposit Contract
+
+- 주소: `0x4242424242424242424242424242424242424242` (devnet 표준)
+- 목적: Validator가 되려면 이 컨트랙트에 32 ETH를 보내야 함
+- genesis-generator가 `genesis.json`에 자동 포함
+- `deposit_contract_block.txt`: deposit contract가 배포된 EL 블록 번호 (devnet에서는 "0")
+- lighthouse가 시작 시 이 파일을 필수로 요구 (deposit 이벤트 스캔 시작점)
+
+#### Premine (사전 할당 계정)
+
+`EL_PREMINE_ADDRS` 환경변수로 genesis에 미리 ETH를 할당:
+```
+EL_PREMINE_ADDRS: '{"0x123463...": {"balance": "1000000000ETH"}}'
+```
+Contract bytecode도 genesis alloc에 포함 가능 (블록 0부터 존재).
+
+#### JWT (JSON Web Token)
+
+EL과 CL이 Engine API로 통신할 때 인증에 사용:
+```
+openssl rand -hex 32 → jwt.hex
+geth: --authrpc.jwtsecret=/secrets/jwt/jwt.hex
+lighthouse: --execution-jwt=/secrets/jwt/jwt.hex
+```
+K8s에서는 Kubernetes Secret으로 관리하여 양쪽 Pod에 마운트.
+
+#### Validator Mnemonics
+
+genesis-generator는 BIP-39 mnemonic에서 validator BLS 키를 derive:
+```yaml
+mnemonics:
+  - mnemonic: "test test test test test test test test test test test junk"
+    count: 1  # 생성할 validator 수
+```
+devnet에서는 test mnemonic 사용. 프로덕션에서는 절대 사용 금지.
+
+---
+
 ## 현재 상태
 
-- `charts/geth/` (v0.1.0) - EL 차트 (private network, genesis init, Engine API, JWT, Ingress/HTTPRoute)
-- `charts/lighthouse/` (v0.1.0) - CL 차트 (beacon node, genesis.ssz 자동 생성, JWT, Ingress/HTTPRoute)
-- JWT 시크릿: geth/lighthouse 간 Kubernetes Secret 공유 구조 완성
-- Genesis: ConfigMap 기반 관리 (EL genesis.json + CL config.yaml)
-- ArgoCD: `valueFiles` + `environments/` 구조로 환경별 values 분리
+- `charts/genesis-generator/` (v0.1.0) - Genesis 생성 StatefulSet + HTTP 서버 (ethpandaops 패턴)
+- `charts/geth/` (v0.1.0) - EL 차트 (private network, genesis init via wget, Engine API, JWT, Ingress/HTTPRoute)
+- `charts/lighthouse/` (v0.1.0) - CL 차트 (beacon node, testnet-dir via wget, JWT, Ingress/HTTPRoute)
+- Genesis: genesis-generator가 EL+CL genesis 생성 → HTTP(8000)로 서빙 → geth/lighthouse initContainer wget
+- JWT 시크릿: geth/lighthouse 간 Kubernetes Secret 공유
+- ArgoCD: `valueFiles` + `environments/` 구조
 - Ingress: Kubernetes Ingress + Cilium Gateway API (HTTPRoute) 듀얼 지원
-- CI: ct lint/install 용 default-values.yaml 작성 완료
-- 검증: `helm template` 렌더링 통과 (기본값, private, ingress, httpRoute 모두)
+- E2E: `e2e/scripts/cluster.sh` (인프라) + `e2e/scripts/ethereum.sh` (체인) 통합 스크립트
+
+## Genesis 생성 Flow
+
+```
+genesis-generator StatefulSet (ethpandaops/ethereum-genesis-generator)
+  ├─ 입력: values.env (chainConfig), mnemonics.yaml
+  ├─ 실행: entrypoint.sh all → genesis 생성
+  ├─ 서빙: python3 -m http.server 8000 --directory /data
+  │         ├─ /metadata/genesis.json    (EL genesis)
+  │         ├─ /metadata/genesis.ssz     (CL genesis, ~2.7MB)
+  │         ├─ /metadata/config.yaml     (CL config)
+  │         └─ /metadata/deposit_contract_block.txt
+  │
+  ├─ geth initContainer
+  │    └─ wget genesis.json → geth init
+  │
+  └─ lighthouse initContainer
+       └─ wget genesis.ssz + config.yaml → --testnet-dir
+```
+
+ConfigMap 방식 대신 HTTP 서버를 사용하는 이유:
+- `genesis.ssz`가 2~3MB → ConfigMap 크기 제한(3MB, base64 시 초과) 위반
+- ethpandaops 표준 패턴 (이미지에 `SERVER_ENABLED` 내장)
+- RBAC 불필요 (ConfigMap 생성 권한이 필요 없음)
 
 ## 설계 결정사항
 
 | 항목 | 결정 | 근거 |
 |------|------|------|
-| CL 클라이언트 | Lighthouse (sigp) | Rust 구현 메모리 효율, ethpandaops 레퍼런스, 커뮤니티 Helm 사례 풍부 |
+| CL 클라이언트 | Lighthouse (sigp) | Rust 구현 메모리 효율, ethpandaops 레퍼런스 |
 | EL-CL 아키텍처 | 별도 Pod (Separate StatefulSets) | 독립 스케일링, 장애 격리, 독립 업그레이드 |
-| genesis.ssz 생성 | lighthouse InitContainer (`ethpandaops/ethereum-genesis-generator`) | 차트만으로 완결, 업계 표준 도구 |
-| Contract 배포 | genesis.json alloc 필드 | 블록 0부터 존재, 단순 확실 |
-| 개발자 계정 ETH | genesis.json alloc 필드 | 동일 |
-| Genesis config 관리 | ConfigMap (EL: genesis.json, CL: config.yaml) | 1MB 이내, K8s 네이티브 |
+| Genesis 생성 | 별도 StatefulSet (`charts/genesis-generator/`) | EL+CL genesis 동시 생성, HTTP 서빙 |
+| Genesis 공유 | HTTP 서버 (port 8000) | genesis.ssz 크기 제한 회피, ethpandaops 표준 |
+| Genesis 소비 | geth/lighthouse initContainer wget | genesis-generator 서비스 ready 후 다운로드 |
+| Contract/계정 | genesis-generator의 `EL_PREMINE_ADDRS` 환경변수 | 블록 0부터 존재 |
 | JWT 관리 | Kubernetes Secret (geth/lighthouse 공유) | existingSecret 패턴 |
-| Values 관리 | `environments/` 디렉토리 + ArgoCD `valueFiles` | inline 대비 확장성, 환경별 diff 명확 |
+| Values 관리 | `environments/` 디렉토리 + ArgoCD `valueFiles` | inline 대비 확장성 |
 | 엔드포인트 노출 | Ingress + HTTPRoute 듀얼 지원 (`ingress.type` 토글) | Cilium Gateway API 대응 |
 | Chain Reset | Phase 4에서 구현 (Helm pre-upgrade Hook 방식 설계) | devnet 특성상 빈번한 초기화 대비 |
+
+### Genesis 소스 우선순위 (하위 호환)
+
+geth/lighthouse 차트는 3가지 genesis 소스를 모두 지원:
+
+| 우선순위 | 방식 | values 키 | 용도 |
+|---------|------|----------|------|
+| 1 (최우선) | HTTP 다운로드 | `genesis.fromUrl` / `testnetDir.fromUrls` | genesis-generator 서버 참조 |
+| 2 | ConfigMap 참조 | `genesis.existingConfigMap` / `testnetDir.existingConfigMap` | 외부 ConfigMap |
+| 3 | inline values | `genesis.config` / `testnetDir.config` | 직접 정의 (소규모 테스트) |
 
 ## 검증 원칙
 
@@ -59,61 +180,95 @@ EL + CL은 **Engine API (JWT 인증)** 로 통신한다.
 
 ### 작업 범위
 
-1. **geth 차트 보강** (완료)
-   - genesis.json ConfigMap 지원 (커스텀 제네시스 블록)
-   - `geth init` InitContainer 추가 (제네시스 초기화, idempotent)
-   - Engine API (authrpc) 포트 및 args 추가
-   - bootnode 설정 지원
-   - private network 모드 (`config.network: private` → `--networkid` 플래그)
-   - JWT Secret 템플릿 추가
-   - Ingress + HTTPRoute 듀얼 지원
+1. **genesis-generator 차트** (완료)
+   - `ethpandaops/ethereum-genesis-generator:5.3.5` 기반 StatefulSet
+   - 이미지 entrypoint(`/work/entrypoint.sh all`)로 genesis 생성 후 HTTP 서빙
+   - `SERVER_ENABLED=true`, `SERVER_PORT=8000`
+   - ConfigMap으로 `values.env` + `mnemonics.yaml` 주입 (subPath 마운트)
+   - Service(ClusterIP)로 클러스터 내부 노출
+   - readinessProbe: `/metadata/genesis.json` HTTP GET
 
-2. **CL 차트 신규 작성** — lighthouse (완료)
-   - StatefulSet 기반 beacon node
-   - `ethpandaops/ethereum-genesis-generator:v5.3.5` InitContainer로 genesis.ssz 자동 생성
-   - EL 연결 설정 (Engine API endpoint)
-   - custom testnet-dir 지원 (CL config.yaml + mnemonics ConfigMap)
-   - Ingress + HTTPRoute 듀얼 지원
+2. **geth 차트 보강** (완료)
+   - `genesis.fromUrl`로 genesis-generator HTTP 서버에서 genesis.json 다운로드
+   - download-genesis initContainer (wget + retry loop)
+   - geth-init initContainer (geth init, idempotent)
+   - Engine API (authrpc) 포트 및 args
+   - private network 모드 (`config.network: private` → `--networkid`)
+   - bootnode, JWT Secret, Ingress + HTTPRoute 듀얼 지원
 
-3. **JWT 시크릿 공유 구조** (완료)
-   - EL과 CL이 동일한 Kubernetes Secret을 `existingSecret`으로 참조
-   - `scripts/generate-jwt-secret.sh` 헬퍼 스크립트 제공
+3. **lighthouse 차트** (완료)
+   - `testnetDir.fromUrls`로 genesis-generator에서 genesis.ssz + config.yaml 다운로드
+   - download-testnet initContainer (wget + retry loop)
+   - `deposit_contract_block.txt` 자동 생성
+   - `command: lighthouse` + `args: beacon_node` (이미지 ENTRYPOINT=null)
+   - JWT, Ingress + HTTPRoute 듀얼 지원
 
-4. **genesis 관리** (완료)
-   - EL: genesis.json을 ConfigMap으로 관리 (values에서 YAML로 정의 → JSON 변환)
-   - CL: config.yaml + deploy_block + mnemonics.yaml을 ConfigMap으로 관리
-   - genesis alloc으로 개발자 계정 ETH 사전 할당 및 contract bytecode 배포 지원
+4. **JWT 시크릿 공유 구조** (완료)
+   - `scripts/generate-jwt-secret.sh` 헬퍼 스크립트
 
 5. **환경별 values 관리** (완료)
-   - `environments/` 디렉토리 도입 (private, mainnet)
-   - ArgoCD Application에서 `valueFiles`로 참조 (inline values 제거)
-   - CI values: `ci/default-values.yaml` 별도 유지
+   - `environments/` 디렉토리 + ArgoCD `valueFiles` 참조
 
-6. **검증** (부분 완료)
-   - `helm template` 렌더링: 통과 (mainnet 기본값, private, ingress, httpRoute)
-   - `ct lint`: 미실행 (CI에서 검증 예정)
-   - `ct install`: 미실행 (Kind 클러스터 필요)
-   - EL-CL 통합 테스트: 미구현
+6. **E2E 테스트 스크립트** (완료)
+   - `e2e/scripts/cluster.sh setup|verify|teardown`
+   - `e2e/scripts/ethereum.sh deploy|verify|teardown`
+
+7. **검증** (EL-CL 연결 확인)
+   - `helm template` 렌더링: 통과
+   - E2E: genesis-generator ✅, geth ✅, lighthouse ✅, EL-CL 연결 (`el_offline: false`) ✅
+   - 블록 생성: ❌ (validator client 미배포)
+
+8. **lighthouse-validator 차트** (다음 작업)
+   - `charts/lighthouse-validator/` 별도 차트로 생성
+   - lighthouse beacon node HTTP API (`http://lighthouse:5052`)로 통신
+   - validator key: devnet은 genesis와 동일 mnemonic으로 initContainer에서 생성
+   - mainnet은 Kubernetes Secret 외부 주입 또는 Web3Signer 연동
+   - 이 차트가 배포되어야 블록 생성이 시작됨
+
+### 배포 순서
+
+```
+1. genesis-generator StatefulSet → HTTP 서버 Ready (readinessProbe 통과)
+2. geth StatefulSet → initContainer wget genesis.json → geth init → Running
+3. lighthouse StatefulSet → initContainer wget genesis.ssz + config.yaml → Running
+4. lighthouse → geth Engine API 연결 (el_offline: false)
+5. lighthouse-validator → lighthouse beacon API 연결 → 블록 생성 시작 (다음 작업)
+```
+
+geth/lighthouse initContainer의 wget은 genesis-generator가 ready될 때까지 자동 retry.
 
 ### 산출물
 
 ```
 charts/
-├── geth/          (private network, genesis, Engine API, JWT, Ingress/HTTPRoute)
-├── lighthouse/    (beacon node, genesis.ssz generator, JWT, Ingress/HTTPRoute)
-└── common/        (변경 없음)
+├── genesis-generator/  (StatefulSet + Service: genesis 생성 → HTTP 서빙)
+├── geth/               (private network, genesis via wget, Engine API, JWT, Ingress/HTTPRoute)
+├── lighthouse/         (beacon node, testnet-dir via wget, JWT, Ingress/HTTPRoute)
+└── common/             (변경 없음)
 
 environments/
 ├── private/
+│   ├── genesis-generator.yaml
 │   ├── geth.yaml
 │   └── lighthouse.yaml
 └── mainnet/
     └── geth.yaml
 
 argocd/applications/
-├── geth.yaml              (mainnet, valueFiles 참조)
-├── geth-private.yaml      (private, valueFiles 참조)
-└── lighthouse-private.yaml (private, valueFiles 참조)
+├── genesis-generator-private.yaml
+├── geth.yaml
+├── geth-private.yaml
+└── lighthouse-private.yaml
+
+e2e/
+├── scripts/
+│   ├── cluster.sh      (setup|verify|teardown)
+│   └── ethereum.sh     (deploy|verify|teardown)
+├── values/
+│   ├── genesis-generator.yaml
+│   ├── geth.yaml
+│   └── lighthouse.yaml
+└── README.md
 
 scripts/
 └── generate-jwt-secret.sh
@@ -126,6 +281,7 @@ scripts/
 ### 목적
 
 퍼블릭 테스트넷에 연결하여 실제 네트워크 환경에서 차트를 검증한다.
+테스트넷은 genesis-generator가 불필요 (공식 genesis 사용).
 
 ### 작업 범위
 
@@ -247,12 +403,14 @@ docs/operations/chain-reset.md                    (운영 가이드)
 ## 차트 개발 순서 요약
 
 ```
-Phase 1 (Private Network) ✅ 완료
-  ├─ geth 차트 보강 (genesis, init, Engine API, bootnode, Ingress/HTTPRoute)
-  ├─ lighthouse 차트 신규 작성 (beacon node, genesis.ssz, Ingress/HTTPRoute)
+Phase 1 (Private Network) — 진행 중
+  ├─ genesis-generator (StatefulSet + HTTP 서빙, ethpandaops 패턴)
+  ├─ geth (genesis via wget, Engine API, Ingress/HTTPRoute)
+  ├─ lighthouse (testnet-dir via wget, Ingress/HTTPRoute)
   ├─ JWT 시크릿 공유 구조
-  ├─ environments/ + valueFiles 구조 도입
-  └─ helm template 렌더링 검증
+  ├─ environments/ + valueFiles 구조
+  ├─ E2E 스크립트 (cluster.sh + ethereum.sh)
+  └─ E2E 검증 (EL-CL 통신)
       ↓
 Phase 2 (Testnet) — 다음 작업
   ├─ checkpoint sync 추가
@@ -277,4 +435,4 @@ Phase 4 (Chain Reset)
 - 차트 자체는 모든 네트워크를 지원하도록 범용적으로 작성
 - 네트워크 차이는 `environments/` 디렉토리의 values 파일에서 처리
 - 엔드포인트 노출은 `ingress.type` 토글로 Ingress/HTTPRoute 선택
-- 참조 프로젝트: [ethpandaops/ethereum-helm-charts](https://github.com/ethpandaops/ethereum-helm-charts), [OffchainLabs/eth-pos-devnet](https://github.com/OffchainLabs/eth-pos-devnet)
+- 참조 프로젝트: [ethpandaops/ethereum-helm-charts](https://github.com/ethpandaops/ethereum-helm-charts), [ethpandaops/ethereum-genesis-generator](https://github.com/ethpandaops/ethereum-genesis-generator)

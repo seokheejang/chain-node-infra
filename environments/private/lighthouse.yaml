@@ -1,4 +1,5 @@
-# Private network (devnet) values for lighthouse
+# Private network (devnet) values for lighthouse.
+# Genesis downloaded from genesis-generator HTTP server.
 replicaCount: 1
 
 config:
@@ -8,32 +9,9 @@ config:
 
 testnetDir:
   enabled: true
-  config:
-    PRESET_BASE: mainnet
-    MIN_GENESIS_ACTIVE_VALIDATOR_COUNT: 1
-    MIN_GENESIS_TIME: 0
-    GENESIS_DELAY: 0
-    SECONDS_PER_SLOT: 12
-    SECONDS_PER_ETH1_BLOCK: 12
-    ETH1_FOLLOW_DISTANCE: 1
-    DEPOSIT_CHAIN_ID: 32382
-    DEPOSIT_NETWORK_ID: 32382
-    DEPOSIT_CONTRACT_ADDRESS: "0x4242424242424242424242424242424242424242"
-    ALTAIR_FORK_EPOCH: 0
-    BELLATRIX_FORK_EPOCH: 0
-    CAPELLA_FORK_EPOCH: 0
-    DENEB_FORK_EPOCH: 0
-    TERMINAL_TOTAL_DIFFICULTY: 0
-  deployBlock: "0"
-  mnemonics:
-    - mnemonic: "test test test test test test test test test test test junk"
-      count: 1
-
-genesisGenerator:
-  enabled: true
-  image: ethpandaops/ethereum-genesis-generator
-  tag: "v5.3.5"
-  elGenesisConfigMap: geth-private-genesis
+  fromUrls:
+    genesisSsz: "http://genesis-generator-private-genesis-generator:8000/metadata/genesis.ssz"
+    configYaml: "http://genesis-generator-private-genesis-generator:8000/metadata/config.yaml"
 
 jwt:
   enabled: true

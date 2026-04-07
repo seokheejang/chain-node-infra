@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "genesis-generator.fullname" . }}
+  labels:
+    {{- include "genesis-generator.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  serviceName: {{ include "genesis-generator.fullname" . }}
+  selector:
+    matchLabels:
+      {{- include "genesis-generator.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "genesis-generator.labels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap-input.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "genesis-generator.serviceAccountName" . }}
+      containers:
+        - name: genesis-generator
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - all
+          env:
+            - name: SERVER_ENABLED
+              value: "true"
+            - name: SERVER_PORT
+              value: {{ .Values.serverPort | quote }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.serverPort }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /metadata/genesis.json
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /metadata/genesis.json
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: config-input
+              mountPath: /config/values.env
+              subPath: values.env
+            - name: config-input
+              mountPath: /config/cl/mnemonics.yaml
+              subPath: mnemonics.yaml
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: config-input
+          configMap:
+            name: {{ include "genesis-generator.fullname" . }}-input
+  {{- if .Values.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        {{- if .Values.persistence.storageClass }}
+        storageClassName: {{ .Values.persistence.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size | quote }}
+  {{- end }}

@@ -1,0 +1,58 @@
+image:
+  # -- Genesis generator image repository
+  repository: ethpandaops/ethereum-genesis-generator
+  # -- Genesis generator image tag
+  tag: "5.3.5"
+  # -- Image pull policy
+  pullPolicy: IfNotPresent
+
+# -- HTTP server port for serving genesis artifacts
+serverPort: 8000
+
+# -- Chain configuration passed as values.env to the generator.
+# The image's built-in CL config.yaml template uses envsubst to substitute these values.
+# See all available vars: https://github.com/ethpandaops/ethereum-genesis-generator
+chainConfig:
+  CHAIN_ID: "32382"
+  DEPOSIT_CONTRACT_ADDRESS: "0x4242424242424242424242424242424242424242"
+  EL_PREMINE_ADDRS: '{}'
+  PRESET_BASE: "mainnet"
+  NUMBER_OF_VALIDATORS: "1"
+  GENESIS_DELAY: "0"
+  SLOT_DURATION_IN_SECONDS: "12"
+  MIN_GENESIS_ACTIVE_VALIDATOR_COUNT: "1"
+  ALTAIR_FORK_EPOCH: "0"
+  BELLATRIX_FORK_EPOCH: "0"
+  CAPELLA_FORK_EPOCH: "0"
+  DENEB_FORK_EPOCH: "0"
+  ELECTRA_FORK_EPOCH: "18446744073709551615"
+  FULU_FORK_EPOCH: "18446744073709551615"
+
+# -- Validator mnemonics for genesis generation
+mnemonics:
+  - mnemonic: "test test test test test test test test test test test junk"
+    count: 1
+
+serviceAccount:
+  # -- Create a ServiceAccount
+  create: true
+  # -- ServiceAccount name (auto-generated if empty)
+  name: ""
+  # -- Annotations for the ServiceAccount
+  annotations: {}
+
+persistence:
+  # -- Enable persistent storage for genesis data
+  enabled: true
+  # -- Storage class (empty for default)
+  storageClass: ""
+  # -- Volume size
+  size: 1Gi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

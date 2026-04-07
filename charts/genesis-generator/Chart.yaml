@@ -1,0 +1,11 @@
+apiVersion: v2
+name: genesis-generator
+description: Helm chart for generating Ethereum genesis files (EL + CL) for private devnets
+type: application
+version: 0.1.0
+appVersion: "5.3.5"
+
+dependencies:
+  - name: common
+    version: 0.1.x
+    repository: "file://../common"

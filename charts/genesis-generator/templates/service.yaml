@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "genesis-generator.fullname" . }}
+  labels:
+    {{- include "genesis-generator.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "genesis-generator.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.serverPort }}
+      targetPort: http
+      protocol: TCP

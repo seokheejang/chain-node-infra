@@ -1,4 +1,5 @@
-# Private network (devnet) values for geth
+# Private network (devnet) values for geth.
+# Genesis downloaded from genesis-generator HTTP server.
 replicaCount: 1
 
 config:
@@ -10,29 +11,7 @@ config:
 
 genesis:
   enabled: true
-  config:
-    config:
-      chainId: 32382
-      homesteadBlock: 0
-      eip150Block: 0
-      eip155Block: 0
-      eip158Block: 0
-      byzantiumBlock: 0
-      constantinopleBlock: 0
-      petersburgBlock: 0
-      istanbulBlock: 0
-      berlinBlock: 0
-      londonBlock: 0
-      shanghaiTime: 0
-      cancunTime: 0
-      terminalTotalDifficulty: 0
-      terminalTotalDifficultyPassed: true
-    alloc:
-      "0x123463a4b065722e99115d6c222f267d9cabb524":
-        balance: "0x200000000000000000000000000000000000000000000000000000000000000"
-    difficulty: "0x1"
-    gasLimit: "0x1c9c380"
-    nonce: "0x0000000000000042"
+  fromUrl: "http://genesis-generator-private-genesis-generator:8000/metadata/genesis.json"
 
 jwt:
   enabled: true

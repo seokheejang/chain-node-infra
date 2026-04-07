@@ -22,6 +22,23 @@ spec:
       {{- end }}
       {{- if .Values.genesis.enabled }}
       initContainers:
+        {{- if .Values.genesis.fromUrl }}
+        - name: download-genesis
+          image: busybox:1.37
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for genesis-generator..."
+              until wget -q --spider {{ .Values.genesis.fromUrl }}; do
+                sleep 5
+              done
+              wget -O /genesis-download/genesis.json {{ .Values.genesis.fromUrl }}
+              echo "Genesis downloaded."
+          volumeMounts:
+            - name: genesis-download
+              mountPath: /genesis-download
+        {{- end }}
         - name: geth-init
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -33,16 +50,26 @@ spec:
             - |
               if [ ! -d {{ .Values.config.dataDir }}/geth/chaindata ]; then
                 echo "Initializing genesis..."
+                {{- if .Values.genesis.fromUrl }}
+                geth init --datadir {{ .Values.config.dataDir }} /genesis-download/genesis.json
+                {{- else }}
                 geth init --datadir {{ .Values.config.dataDir }} /config/genesis.json
+                {{- end }}
               else
                 echo "Chain data already exists, skipping init."
               fi
           volumeMounts:
             - name: data
               mountPath: {{ .Values.config.dataDir }}
+            {{- if .Values.genesis.fromUrl }}
+            - name: genesis-download
+              mountPath: /genesis-download
+              readOnly: true
+            {{- else }}
             - name: genesis
               mountPath: /config
               readOnly: true
+            {{- end }}
       {{- end }}
       containers:
         - name: geth
@@ -154,6 +181,10 @@ spec:
             {{- end }}
         {{- end }}
         {{- if .Values.genesis.enabled }}
+        {{- if .Values.genesis.fromUrl }}
+        - name: genesis-download
+          emptyDir: {}
+        {{- else }}
         - name: genesis
           configMap:
             {{- if .Values.genesis.existingConfigMap }}
@@ -161,6 +192,7 @@ spec:
             {{- else }}
             name: {{ include "geth.fullname" . }}-genesis
             {{- end }}
+        {{- end }}
         {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}

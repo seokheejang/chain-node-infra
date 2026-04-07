@@ -105,23 +105,15 @@ config:
   extraArgs: []
 
 genesis:
-  # -- Enable genesis.json ConfigMap and geth init InitContainer
+  # -- Enable genesis initialization (geth init)
   enabled: false
   # -- Genesis configuration content (YAML, rendered to JSON)
-  # Example for private PoS network:
-  #   config:
-  #     chainId: 32382
-  #     homesteadBlock: 0
-  #     terminalTotalDifficulty: 0
-  #     terminalTotalDifficultyPassed: true
-  #   alloc:
-  #     "0xYourAddress":
-  #       balance: "0x200000000000000000000000000000000000000000000000000000000000000"
-  #   difficulty: "0x1"
-  #   gasLimit: "0x1c9c380"
   config: {}
-  # -- Use existing ConfigMap for genesis.json instead of creating one
+  # -- Use existing ConfigMap for genesis.json
   existingConfigMap: ""
+  # -- Download genesis.json from HTTP URL (e.g., genesis-generator server)
+  # When set, an initContainer downloads genesis.json before geth init.
+  fromUrl: ""
 
 jwt:
   # -- Enable JWT authentication for Engine API

@@ -1,4 +1,4 @@
-{{- if and (or .Values.testnetDir.enabled .Values.genesisGenerator.enabled) (not .Values.testnetDir.existingConfigMap) }}
+{{- if and .Values.testnetDir.enabled (not .Values.testnetDir.existingConfigMap) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -9,8 +9,4 @@ data:
   config.yaml: |
     {{- .Values.testnetDir.config | toYaml | nindent 4 }}
   deploy_block: {{ .Values.testnetDir.deployBlock | quote }}
-  {{- if .Values.testnetDir.mnemonics }}
-  mnemonics.yaml: |
-    {{- .Values.testnetDir.mnemonics | toYaml | nindent 4 }}
-  {{- end }}
 {{- end }}

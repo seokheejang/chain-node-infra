@@ -1,0 +1,28 @@
+# E2E genesis-generator values for Kind cluster.
+# Generates EL+CL genesis and serves via HTTP on port 8000.
+chainConfig:
+  CHAIN_ID: "32382"
+  DEPOSIT_CONTRACT_ADDRESS: "0x4242424242424242424242424242424242424242"
+  NUMBER_OF_VALIDATORS: "1"
+  GENESIS_DELAY: "0"
+  SLOT_DURATION_IN_SECONDS: "12"
+  MIN_GENESIS_ACTIVE_VALIDATOR_COUNT: "1"
+  EL_PREMINE_ADDRS: '{"0x123463a4b065722e99115d6c222f267d9cabb524": {"balance": "1000000000ETH"}}'
+  ALTAIR_FORK_EPOCH: "0"
+  BELLATRIX_FORK_EPOCH: "0"
+  CAPELLA_FORK_EPOCH: "0"
+  DENEB_FORK_EPOCH: "0"
+  ELECTRA_FORK_EPOCH: "18446744073709551615"
+  FULU_FORK_EPOCH: "18446744073709551615"
+
+persistence:
+  enabled: true
+  size: 1Gi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

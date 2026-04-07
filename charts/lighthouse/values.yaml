@@ -107,24 +107,13 @@ testnetDir:
   config: {}
   # -- Execution block number at which the beacon chain was deployed
   deployBlock: "0"
-  # -- Validator mnemonics for genesis generation (as YAML list)
-  # Example:
-  #   - mnemonic: "test test test test test test test test test test test junk"
-  #     count: 1
-  mnemonics: []
   # -- Use existing ConfigMap for testnet-dir files
   existingConfigMap: ""
-
-# -- Genesis SSZ generator InitContainer configuration
-genesisGenerator:
-  # -- Enable InitContainer to auto-generate genesis.ssz
-  enabled: false
-  # -- Generator image repository
-  image: ethpandaops/ethereum-genesis-generator
-  # -- Generator image tag
-  tag: "v5.3.5"
-  # -- Name of the geth genesis ConfigMap to reference for EL genesis
-  elGenesisConfigMap: ""
+  # -- Download testnet files from HTTP URLs (e.g., genesis-generator server)
+  # When set, an initContainer downloads files before lighthouse starts.
+  fromUrls:
+    genesisSsz: ""
+    configYaml: ""
 
 jwt:
   # -- Enable JWT authentication (required for Engine API)

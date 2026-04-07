@@ -1,0 +1,13 @@
+# Values for chart-testing (ct lint / ct install) in Kind cluster.
+# Generates a minimal private PoS devnet genesis.
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+job:
+  activeDeadlineSeconds: 300
+  backoffLimit: 2
