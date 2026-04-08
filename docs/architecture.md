@@ -16,6 +16,8 @@ chain-node-infra/
 
 ## GitOps Flow
 
+![GitOps Workflow](diagrams/assets/04-gitops-workflow.png)
+
 ```
 Developer          GitHub             ArgoCD              Kubernetes
    │                  │                  │                     │
@@ -29,6 +31,12 @@ Developer          GitHub             ArgoCD              Kubernetes
    │                  │                  │<── health check ────┤
    │                  │                  ├─ status: Synced     │
 ```
+
+## Ethereum Private Network Architecture
+
+![Architecture Overview](diagrams/assets/01-architecture.png)
+
+![Deployment Sequence](diagrams/assets/02-deployment-sequence.png)
 
 ## Chart Design Principles
 

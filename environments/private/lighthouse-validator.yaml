@@ -6,6 +6,7 @@ config:
   network: private
   dataDir: /data/lighthouse-validator
   beaconNodes: "http://lighthouse-private:5052"
+  suggestedFeeRecipient: "0x0000000000000000000000000000000000000001"
 
 testnetDir:
   enabled: true
@@ -18,7 +19,7 @@ validatorKeys:
     enabled: true
     mnemonic: "test test test test test test test test test test test junk"
     startIndex: 0
-    count: 1
+    count: 64
 
 resources:
   requests:

@@ -1,0 +1,18 @@
+flowchart LR
+    DEV["Developer"] -- "git push" --> REPO["GitHub Repo chain-node-infra"]
+
+    subgraph Repo["Repository Structure"]
+        CHARTS["charts/"]
+        ENVS["environments/"]
+        APPS["argocd/applications/"]
+    end
+
+    REPO --> CHARTS
+    REPO --> ENVS
+    REPO --> APPS
+
+    APPS -- "sync" --> ARGO["ArgoCD"]
+    ARGO -- "helm install + valueFiles" --> K8S["Kubernetes Cluster"]
+
+    CHARTS -.- ARGO
+    ENVS -.- ARGO

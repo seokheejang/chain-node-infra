@@ -10,8 +10,8 @@
 #   Scripts also source .envrc automatically if present.
 
 # --- Kubernetes ---
-# Path to your kubeconfig file
-export KUBECONFIG="${PWD}/.kubeconfig"
+# Path to your kubeconfig file (uncomment and set your path)
+# If unset, kubectl uses the default ~/.kube/config
 # export KUBECONFIG="${HOME}/.kube/config"
 
 # Kubernetes context to use (optional, defaults to current-context in kubeconfig)

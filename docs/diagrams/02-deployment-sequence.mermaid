@@ -1,0 +1,33 @@
+sequenceDiagram
+    participant GG as genesis-generator
+    participant GETH as geth
+    participant LH as lighthouse
+    participant LHV as lighthouse-validator
+
+    Note over GG: Phase 1 - Genesis Generation
+    GG->>GG: entrypoint.sh all
+    GG->>GG: Generate genesis.json (EL)
+    GG->>GG: Generate genesis.ssz (CL)
+    GG->>GG: Generate config.yaml (CL)
+    GG->>GG: python3 -m http.server 8000
+    Note over GG: readinessProbe GET /metadata/genesis.json
+
+    Note over GETH: Phase 2 - EL Init
+    GETH->>GG: initContainer wget genesis.json (retry)
+    GETH->>GETH: initContainer geth init
+    GETH->>GETH: Start geth with JWT
+
+    Note over LH: Phase 3 - CL Init
+    LH->>GG: initContainer wget genesis.ssz + config.yaml (retry)
+    LH->>LH: Create deposit_contract_block.txt
+    LH->>LH: Start lighthouse beacon_node
+    LH->>GETH: Engine API connection (JWT)
+    Note over LH,GETH: el_offline false
+
+    Note over LHV: Phase 4 - Validator Init
+    LHV->>GG: initContainer wget genesis.ssz + config.yaml
+    LHV->>LHV: lighthouse account validator recover
+    Note over LHV: BLS keys from same mnemonic
+    LHV->>LHV: Start lighthouse validator_client
+    LHV->>LH: Beacon API connection 5052
+    Note over LHV,LH: Block production starts

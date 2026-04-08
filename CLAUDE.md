@@ -98,6 +98,11 @@ Every chart under `charts/` must have:
 - chart-releaser packages and publishes charts on merge to main.
 - The `ci/` directory inside each chart is for ct test values only, NOT for environments.
 
+## Learnings
+
+작업 중 발견한 패턴, 해결법, 의사결정 근거는 `docs/learnings/`에 축적됨.
+새 작업 시작 전 관련 학습 기록이 있는지 확인하면 삽질을 줄일 수 있음.
+
 ## Development Commands
 
 - `make lint` - run chart-testing lint via Docker

@@ -1,0 +1,42 @@
+flowchart TB
+    subgraph K8s["Kubernetes Cluster"]
+
+        subgraph Genesis["genesis-generator (StatefulSet)"]
+            GG["ethpandaops/genesis-generator:5.3.5"]
+            HTTP["HTTP Server :8000"]
+            GG --> HTTP
+        end
+
+        subgraph EL["Execution Layer"]
+            GETH["geth (StatefulSet)"]
+            GETH_PVC[("PVC 50Gi chaindata")]
+            GETH --- GETH_PVC
+        end
+
+        subgraph CL["Consensus Layer"]
+            LH["lighthouse (StatefulSet)"]
+            LH_PVC[("PVC 20Gi beacon data")]
+            LH --- LH_PVC
+        end
+
+        subgraph VC["Validator"]
+            LHV["lighthouse-validator"]
+            KEYS["emptyDir validator keys"]
+            LHV --- KEYS
+        end
+
+        JWT{{"JWT Secret (K8s Secret)"}}
+
+        HTTP -- "genesis.json" --> GETH
+        HTTP -- "genesis.ssz + config.yaml" --> LH
+        HTTP -- "genesis.ssz + config.yaml" --> LHV
+
+        LH <-- "Engine API :8551 (JWT)" --> GETH
+        JWT -.- GETH
+        JWT -.- LH
+
+        LHV -- "Beacon API :5052" --> LH
+    end
+
+    USER(("External Access")) -- "RPC :8545 Ingress" --> GETH
+    USER -- "Beacon API :5052 Ingress" --> LH
