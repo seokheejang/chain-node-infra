@@ -13,5 +13,15 @@ data:
     export {{ $key }}={{ $value | quote }}
     {{- end }}
     {{- end }}
+    {{- if .Values.preloadedContracts.enabled }}
+    {{- $root := . }}
+    {{- $contracts := dict }}
+    {{- range .Values.preloadedContracts.contracts }}
+    {{- $code := $root.Files.Get .file | trim }}
+    {{- $entry := dict "balance" "0" "code" $code "nonce" (.nonce | toString) }}
+    {{- $_ := set $contracts (lower .address) $entry }}
+    {{- end }}
+    export ADDITIONAL_PRELOADED_CONTRACTS={{ $contracts | toJson | quote }}
+    {{- end }}
   mnemonics.yaml: |
     {{- .Values.mnemonics | toYaml | nindent 4 }}

@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v0.4 -- 인프라 컨트랙트 사전 배포 (2026-04-09)
+
+- [task-05-infra-contracts.md](archive/task-05-infra-contracts.md) 작업 문서
+- genesis-generator: `ADDITIONAL_PRELOADED_CONTRACTS`로 mainnet 인프라 컨트랙트 3개 사전 배포
+  - CREATE2 Deployer (`0x4e59b44...4956C`) — Foundry/Hardhat deterministic deploy
+  - Multicall3 (`0xcA11bde0...CA11`) — viem/ethers/wagmi 자동 호출
+  - ERC-1820 Registry (`0x1820a4B7...fAD24`) — ERC-777/1155 인터페이스 레지스트리
+- chart: `files/preloaded/*.hex`에 runtime bytecode 분리 저장 + `.Files.Get` 패턴
+- chart: `preloadedContracts.enabled` flag로 통째 비활성 가능
+- 검증: `eth_getCode` 3개 모두 OK, Multicall3 `getCurrentBlockTimestamp/getEthBalance/getChainId` 정상 동작
+
 ## v0.3 -- Devnet 운영 개선: Premine, Ingress, Pectra, RPC API (2026-04-09)
 
 - [task-04-devnet-improvements.md](archive/task-04-devnet-improvements.md) 작업 문서
