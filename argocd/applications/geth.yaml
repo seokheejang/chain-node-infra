@@ -7,13 +7,18 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
-  source:
-    repoURL: https://github.com/seokheejang/chain-node-infra.git
-    targetRevision: main
-    path: charts/geth
-    helm:
-      valueFiles:
-        - ../../environments/mainnet/geth.yaml
+  sources:
+    # Helm chart from GHCR (OCI). Pin to immutable version.
+    - repoURL: ghcr.io/seokheejang/chain-node-infra
+      chart: geth
+      targetRevision: 0.1.0
+      helm:
+        valueFiles:
+          - $values/environments/mainnet/geth.yaml
+    # Values from this same git repo, mounted as $values.
+    - repoURL: https://github.com/seokheejang/chain-node-infra.git
+      targetRevision: main
+      ref: values
   destination:
     server: https://kubernetes.default.svc
     namespace: ethereum

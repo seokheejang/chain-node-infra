@@ -12,4 +12,4 @@ annotations:
 dependencies:
   - name: common
     version: 0.1.x
-    repository: "file://../common"
+    repository: "oci://ghcr.io/seokheejang/chain-node-infra"

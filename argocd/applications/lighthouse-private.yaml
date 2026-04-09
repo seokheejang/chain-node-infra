@@ -7,13 +7,16 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
-  source:
-    repoURL: https://github.com/seokheejang/chain-node-infra.git
-    targetRevision: main
-    path: charts/lighthouse
-    helm:
-      valueFiles:
-        - ../../environments/private/lighthouse.yaml
+  sources:
+    - repoURL: ghcr.io/seokheejang/chain-node-infra
+      chart: lighthouse
+      targetRevision: 0.1.0
+      helm:
+        valueFiles:
+          - $values/environments/private/lighthouse.yaml
+    - repoURL: https://github.com/seokheejang/chain-node-infra.git
+      targetRevision: main
+      ref: values
   destination:
     server: https://kubernetes.default.svc
     namespace: ethereum-private

@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## v0.5 -- GHCR(OCI) Helm Chart Publishing (2026-04-09)
+
+- [task-06-ghcr-publishing.md](archive/task-06-ghcr-publishing.md) 작업 문서
+- 5개 chart를 GHCR OCI 레지스트리로 publish (`ghcr.io/seokheejang/chain-node-infra/<chart>`, 패턴 C)
+  - `common`, `geth`, `lighthouse`, `lighthouse-validator`, `genesis-generator` v0.1.0 — 모두 public, 익명 pull 가능
+- workflow: tag 트리거(`<chart>-<semver>`) + raw helm CLI + 멱등성(`helm show chart` 사전 체크)
+  - 기존 `chart-releaser-action` (gh-pages) 제거, OCI 단일 채널로 단순화
+  - tag-Chart.yaml version 일치 검증 step 포함
+- chart: 5개 `Chart.yaml`에 OCI annotation 추가 (`source`/`licenses`/`description`)
+- chart: 4개 app chart의 `common` 의존성을 `file://../common` → `oci://ghcr.io/...`로 전환 (immutability 보장)
+- argocd: 5개 Application을 git path 단일 source → OCI multi-source(chart=OCI, values=`$values` ref)로 전환 (자기 dog food)
+- README: "Use in Other Projects" 섹션 추가 — helm CLI / ArgoCD multi-source / internal registry mirroring(`oras copy`) 3패턴 + maintainer release 절차
+- 검증: 5회 workflow 모두 success, OCI render == 로컬 render byte 일치, `common` 4번 fetch 동일 digest
+- 비목표(분리): cosign signing → task-07 예정
+
 ## v0.4 -- 인프라 컨트랙트 사전 배포 (2026-04-09)
 
 - [task-05-infra-contracts.md](archive/task-05-infra-contracts.md) 작업 문서

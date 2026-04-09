@@ -73,14 +73,19 @@ make docs
 
 ### Deploy to Cluster
 
+Recommended: install from GHCR (no clone needed). For local development against a working tree, use the local source path instead.
+
 ```bash
 # Ensure .envrc is loaded with a valid KUBECONFIG
 
-# Update dependencies and render templates
-helm dependency update charts/geth
-helm template my-geth charts/geth
+# From GHCR (recommended)
+helm install my-geth oci://ghcr.io/seokheejang/chain-node-infra/geth \
+  --version 0.1.0 \
+  -n ethereum --create-namespace \
+  -f my-values.yaml
 
-# Install to cluster
+# From local source (for chart development)
+helm dependency update charts/geth
 helm install my-geth charts/geth -n ethereum --create-namespace
 ```
 
@@ -92,6 +97,102 @@ See [docs/archive/task-01-argocd-installation.md](docs/archive/task-01-argocd-in
 # Ensure ArgoCD is installed and .envrc is loaded
 kubectl apply -f argocd/applications/geth.yaml
 ```
+
+The example Application manifests in [argocd/applications/](argocd/applications/) use the multi-source pattern: chart from GHCR (immutable version pin), values from this repo via `$values` ref. See [Use in Other Projects](#use-in-other-projects) for the full pattern.
+
+## Use in Other Projects
+
+All charts are published to **GitHub Container Registry (GHCR)** as OCI artifacts on every per-chart semver tag. Public, no authentication required.
+
+**Available charts** (all at `0.1.0`):
+
+```
+oci://ghcr.io/seokheejang/chain-node-infra/geth
+oci://ghcr.io/seokheejang/chain-node-infra/lighthouse
+oci://ghcr.io/seokheejang/chain-node-infra/lighthouse-validator
+oci://ghcr.io/seokheejang/chain-node-infra/genesis-generator
+oci://ghcr.io/seokheejang/chain-node-infra/common               # library, dependency only
+```
+
+### Pattern 1: helm CLI (any consumer)
+
+```bash
+helm pull oci://ghcr.io/seokheejang/chain-node-infra/geth --version 0.1.0
+helm template test oci://ghcr.io/seokheejang/chain-node-infra/geth --version 0.1.0 -f my-values.yaml
+helm install my-geth oci://ghcr.io/seokheejang/chain-node-infra/geth \
+  --version 0.1.0 -n ethereum --create-namespace -f my-values.yaml
+```
+
+### Pattern 2: ArgoCD multi-source (recommended for production)
+
+Keep your private repo free of chart code — store only the Application manifest and values:
+
+```
+your-private-infra/
+├── argocd/applications/geth-mainnet.yaml
+└── values/geth-mainnet.yaml         # your environment-specific overrides
+```
+
+`geth-mainnet.yaml`:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: geth-mainnet
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    # Chart from GHCR — immutable version pin
+    - repoURL: ghcr.io/seokheejang/chain-node-infra
+      chart: geth
+      targetRevision: 0.1.0
+      helm:
+        valueFiles:
+          - $values/values/geth-mainnet.yaml
+    # Values from your own repo — mounted as $values
+    - repoURL: git@github.com:your-org/your-private-infra.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ethereum
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true, ServerSideApply=true]
+```
+
+ArgoCD ≥ 2.7 supports OCI Helm sources natively. Upgrade = bump `targetRevision` only.
+
+### Pattern 3: Internal registry mirroring (production hardening)
+
+For air-gapped or supply-chain-sensitive environments, mirror to your internal registry (ECR / Harbor / Nexus / GitLab) so production never depends on external GHCR availability:
+
+```bash
+# Using oras (https://oras.land)
+oras copy \
+  ghcr.io/seokheejang/chain-node-infra/geth:0.1.0 \
+  <internal-registry>/helm/chain-node-infra/geth:0.1.0
+```
+
+Then point your ArgoCD `repoURL` at the internal registry.
+
+### Releasing a new version (maintainer)
+
+Releases are tag-triggered. To publish a new chart version:
+
+```bash
+# 1. Bump version in Chart.yaml
+vim charts/geth/Chart.yaml          # version: 0.1.0 → 0.1.1
+git commit -am "chore(geth): bump to 0.1.1" && git push
+
+# 2. Push the per-chart tag
+git tag geth-0.1.1
+git push origin geth-0.1.1
+```
+
+The [Release Charts workflow](.github/workflows/release.yaml) packages all charts and pushes only versions not yet on GHCR (idempotent). Tag convention: `<chart-name>-<semver>`.
 
 ## Private Devnet (Local Development)
 

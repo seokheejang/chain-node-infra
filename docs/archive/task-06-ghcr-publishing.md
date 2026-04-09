@@ -1,8 +1,20 @@
 # Task 06: GHCR(OCI) Helm Chart Publishing
 
 **날짜**: 2026-04-09
-**상태**: 진행 중 (계획 확정)
-**최종 갱신**: 2026-04-09 (best-practice 리서치 반영, OCI 경로 패턴 C 채택)
+**상태**: 완료
+**최종 갱신**: 2026-04-09 (Phase A~D 실행 완료, Phase E 후속 작업 적용)
+
+## 작업 결과 요약
+
+- 5개 chart 모두 `ghcr.io/seokheejang/chain-node-infra/<chart>` 경로로 GHCR 첫 publish 성공 (`common`, `geth`, `lighthouse`, `lighthouse-validator`, `genesis-generator` v0.1.0)
+- Tag 트리거 workflow 5회 모두 success (17~30초). 멱등성 로직 정상 동작 확인
+- 익명 pull 검증 — GHCR이 source repo public 가시성을 자동 승계, 수동 public 전환 불필요
+- `helm template`로 OCI fetch 결과와 로컬 source 렌더 결과가 byte-level 일치 (Pulled/Digest 메타 라인 제외)
+- Phase E 후속 작업 함께 완료:
+  - `common` 의존성을 4개 app chart에서 `file://../common` → `oci://ghcr.io/seokheejang/chain-node-infra` 로 전환. 4번 fetch 모두 동일 digest (`sha256:9779a7...`) — immutability 검증
+  - `argocd/applications/*.yaml` 5개를 git path 단일 source → OCI multi-source(chart는 OCI, values는 `$values` ref)로 전환. 자기 dog food
+  - `README.md`에 "Use in Other Projects" 섹션 추가 (helm CLI / ArgoCD multi-source / internal mirroring 3패턴 + release 절차)
+- 미수행 비목표: cosign signing → task-07로 분리 예정
 
 ## 배경
 
