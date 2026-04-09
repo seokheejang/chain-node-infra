@@ -4,6 +4,10 @@ description: Helm chart for deploying go-ethereum (geth) execution layer RPC nod
 type: application
 version: 0.1.0
 appVersion: "1.14.12"
+annotations:
+  org.opencontainers.image.source: https://github.com/seokheejang/chain-node-infra
+  org.opencontainers.image.licenses: MIT
+  org.opencontainers.image.description: go-ethereum (geth) execution layer RPC node for Kubernetes
 
 dependencies:
   - name: common

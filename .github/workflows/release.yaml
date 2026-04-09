@@ -1,32 +1,75 @@
 name: Release Charts
 
+# Tag-triggered Helm chart publishing to GHCR (OCI).
+#
+# Trigger: push a per-chart semver tag like `geth-0.1.1` or `lighthouse-0.2.0`.
+# The workflow packages all charts under charts/* and pushes any whose version
+# is not yet on GHCR. Idempotent: existing versions are skipped.
+#
+# Tag convention: `<chart-name>-<semver>`
+# Example: `git tag geth-0.1.1 && git push origin geth-0.1.1`
+
 on:
   push:
-    branches:
-      - main
-    paths:
-      - "charts/**"
+    tags:
+      - '*-[0-9]+.[0-9]+.[0-9]+'
 
 jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      packages: write           # GHCR push
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Configure Git
-        run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
       - name: Set up Helm
         uses: azure/setup-helm@v4
 
-      - name: Run chart-releaser
-        uses: helm/chart-releaser-action@v1
+      - name: Validate tag matches Chart.yaml version
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"           # e.g. geth-0.1.1
+          chart_name="${tag%-*}"
+          tag_version="${tag##*-}"
+          chart_yaml="charts/${chart_name}/Chart.yaml"
+          if [ ! -f "$chart_yaml" ]; then
+            echo "ERROR: chart not found: $chart_yaml (parsed from tag '$tag')"
+            exit 1
+          fi
+          chart_version=$(grep '^version:' "$chart_yaml" | awk '{print $2}' | tr -d '"')
+          if [ "$tag_version" != "$chart_version" ]; then
+            echo "ERROR: tag version ($tag_version) != Chart.yaml version ($chart_version) for $chart_name"
+            exit 1
+          fi
+          echo "OK: $chart_name @ $chart_version"
+
+      - name: Log in to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Package and push charts to GHCR
         env:
-          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          OCI_REPO: oci://ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
+        run: |
+          set -euo pipefail
+          mkdir -p .release-packages
+          for chart in charts/*/; do
+            echo "::group::Packaging $chart"
+            helm dependency update "$chart"
+            helm package "$chart" -d .release-packages
+            echo "::endgroup::"
+          done
+          for tgz in .release-packages/*.tgz; do
+            name=$(basename "$tgz" .tgz)         # e.g. geth-0.1.1
+            chart_name="${name%-*}"
+            version="${name##*-}"
+            # Idempotency: skip if version already exists on GHCR.
+            # First release naturally 404s and falls through to push.
+            if helm show chart "${OCI_REPO}/${chart_name}" --version "${version}" >/dev/null 2>&1; then
+              echo "skip: ${chart_name}@${version} already published"
+              continue
+            fi
+            echo "push: ${chart_name}@${version}"
+            helm push "$tgz" "$OCI_REPO"
+          done

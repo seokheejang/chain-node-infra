@@ -4,6 +4,10 @@ description: Helm chart for generating Ethereum genesis files (EL + CL) for priv
 type: application
 version: 0.1.0
 appVersion: "5.3.5"
+annotations:
+  org.opencontainers.image.source: https://github.com/seokheejang/chain-node-infra
+  org.opencontainers.image.licenses: MIT
+  org.opencontainers.image.description: Ethereum genesis file generator (EL + CL) for private devnets
 
 dependencies:
   - name: common

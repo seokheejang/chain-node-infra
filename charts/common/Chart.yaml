@@ -3,3 +3,7 @@ name: common
 description: A library chart providing shared helper templates for chain-node-infra charts
 type: library
 version: 0.1.0
+annotations:
+  org.opencontainers.image.source: https://github.com/seokheejang/chain-node-infra
+  org.opencontainers.image.licenses: MIT
+  org.opencontainers.image.description: Shared helper templates (naming, labels) consumed as a Helm dependency by other chain-node-infra charts
