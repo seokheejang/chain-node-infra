@@ -2,10 +2,10 @@
 # Ref: https://kind.sigs.k8s.io/docs/user/configuration/
 #
 # Topology:
-#   - control-plane: ArgoCD, cluster services
+#   - control-plane: ArgoCD, nginx-ingress, cluster services
 #   - worker:        blockchain nodes (geth, lighthouse, etc.)
 #
-# Access blockchain node ports via kubectl port-forward.
+# Access via nginx-ingress on ports 80/443 with nip.io hostnames.
 # Host requirements: Docker with 4+ CPU, 6+ GB RAM allocated.
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
@@ -21,6 +21,14 @@ nodes:
       # ArgoCD UI (NodePort)
       - containerPort: 30080
         hostPort: 8080
+        protocol: TCP
+      # nginx-ingress HTTP
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      # nginx-ingress HTTPS
+      - containerPort: 443
+        hostPort: 443
         protocol: TCP
 
   - role: worker

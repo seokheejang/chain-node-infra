@@ -99,10 +99,15 @@ spec:
             - --http.addr=0.0.0.0
             - --http.port={{ .Values.service.ports.rpc }}
             - --http.vhosts=*
+            - --http.api={{ .Values.config.httpApi }}
+            {{- if .Values.config.httpCorsDomain }}
+            - --http.corsdomain={{ .Values.config.httpCorsDomain }}
+            {{- end }}
             - --ws
             - --ws.addr=0.0.0.0
             - --ws.port={{ .Values.service.ports.ws }}
             - --ws.origins=*
+            - --ws.api={{ .Values.config.wsApi }}
             {{- if .Values.metrics.enabled }}
             - --metrics
             - --metrics.addr=0.0.0.0

@@ -21,8 +21,8 @@ LIGHTHOUSE_RELEASE="lighthouse-e2e"
 VALIDATOR_RELEASE="validator-e2e"
 JWT_SECRET_NAME="ethereum-jwt"
 E2E_KUBECONFIG="${E2E_DIR}/.kubeconfig"
-GETH_LOCAL_PORT=18545
-LIGHTHOUSE_LOCAL_PORT=15052
+GETH_INGRESS_HOST="geth-rpc.127.0.0.1.nip.io"
+LIGHTHOUSE_INGRESS_HOST="lighthouse-api.127.0.0.1.nip.io"
 
 # --- Parse command ---
 COMMAND="${1:-}"
@@ -50,15 +50,6 @@ export KUBECONFIG="${E2E_KUBECONFIG}"
 
 PASS=0
 FAIL=0
-PIDS_TO_KILL=()
-
-cleanup_pids() {
-    for pid in "${PIDS_TO_KILL[@]}"; do
-        kill "$pid" 2>/dev/null
-        wait "$pid" 2>/dev/null
-    done
-    PIDS_TO_KILL=()
-}
 
 check() {
     local label="$1"
@@ -191,8 +182,8 @@ cmd_deploy() {
     echo "==========================================="
     echo ""
     echo "  Namespace    : ${NAMESPACE}"
-    echo "  Geth RPC     : kubectl port-forward svc/${GETH_RELEASE} 8545:8545 -n ${NAMESPACE}"
-    echo "  Lighthouse   : kubectl port-forward svc/${LIGHTHOUSE_RELEASE} 5052:5052 -n ${NAMESPACE}"
+    echo "  Geth RPC     : http://${GETH_INGRESS_HOST}"
+    echo "  Lighthouse   : http://${LIGHTHOUSE_INGRESS_HOST}"
     echo "  Validator    : ${VALIDATOR_RELEASE}"
     echo ""
     echo "  Teardown     : e2e/scripts/ethereum.sh teardown"
@@ -203,7 +194,6 @@ cmd_verify() {
     require_cmd kubectl
     require_cmd curl
     preflight
-    trap cleanup_pids EXIT
 
     PASS=0
     FAIL=0
@@ -221,39 +211,38 @@ cmd_verify() {
     check "Validator pod ready" \
         "kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=${VALIDATOR_RELEASE} -n ${NAMESPACE} --timeout=10s"
 
-    # Port Forwards
+    # Ingress Readiness
     echo ""
-    echo "Starting port-forwards..."
-    kubectl port-forward "svc/${GETH_RELEASE}" "${GETH_LOCAL_PORT}:8545" -n "${NAMESPACE}" &>/dev/null &
-    PIDS_TO_KILL+=($!)
-    kubectl port-forward "svc/${LIGHTHOUSE_RELEASE}" "${LIGHTHOUSE_LOCAL_PORT}:5052" -n "${NAMESPACE}" &>/dev/null &
-    PIDS_TO_KILL+=($!)
-    sleep 3
+    echo "Ingress:"
+    check "Geth ingress exists" \
+        "kubectl get ingress ${GETH_RELEASE} -n ${NAMESPACE}"
+    check "Lighthouse ingress exists" \
+        "kubectl get ingress ${LIGHTHOUSE_RELEASE} -n ${NAMESPACE}"
 
-    # Geth Health
+    # Geth Health (via ingress)
     echo ""
-    echo "Geth (EL):"
-    wait_for "RPC responds (eth_syncing)" 30 \
+    echo "Geth (EL) via ingress (${GETH_INGRESS_HOST}):"
+    wait_for "RPC responds (eth_syncing)" 60 \
         "curl -sf -X POST -H 'Content-Type: application/json' \
             --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_syncing\",\"params\":[],\"id\":1}' \
-            http://localhost:${GETH_LOCAL_PORT}"
+            http://${GETH_INGRESS_HOST}"
 
     wait_for "eth_blockNumber responds" 30 \
         "curl -sf -X POST -H 'Content-Type: application/json' \
             --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' \
-            http://localhost:${GETH_LOCAL_PORT}"
+            http://${GETH_INGRESS_HOST}"
 
-    # Lighthouse Health
+    # Lighthouse Health (via ingress)
     echo ""
-    echo "Lighthouse (CL):"
-    wait_for "Beacon API responds (/lighthouse/health)" 30 \
-        "curl -sf http://localhost:${LIGHTHOUSE_LOCAL_PORT}/lighthouse/health"
+    echo "Lighthouse (CL) via ingress (${LIGHTHOUSE_INGRESS_HOST}):"
+    wait_for "Beacon API responds (/lighthouse/health)" 60 \
+        "curl -sf http://${LIGHTHOUSE_INGRESS_HOST}/lighthouse/health"
 
     # EL-CL Connection
     echo ""
     echo "EL-CL Communication:"
     wait_for "Engine API connected (el_offline=false)" 90 \
-        "curl -sf http://localhost:${LIGHTHOUSE_LOCAL_PORT}/eth/v1/node/syncing | grep -q '\"el_offline\":false'"
+        "curl -sf http://${LIGHTHOUSE_INGRESS_HOST}/eth/v1/node/syncing | grep -q '\"el_offline\":false'"
 
     # Block Production
     echo ""
@@ -261,12 +250,8 @@ cmd_verify() {
     wait_for "Block number > 3 (validator producing blocks)" 180 \
         "curl -sf -X POST -H 'Content-Type: application/json' \
             --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' \
-            http://localhost:${GETH_LOCAL_PORT} \
+            http://${GETH_INGRESS_HOST} \
             | python3 -c 'import sys,json; r=json.load(sys.stdin); sys.exit(0 if int(r[\"result\"],16)>3 else 1)'"
-
-    # Cleanup port-forwards
-    cleanup_pids
-    trap - EXIT
 
     # Summary
     echo ""
@@ -281,6 +266,7 @@ cmd_verify() {
         echo "    kubectl logs sts/${LIGHTHOUSE_RELEASE} -n ${NAMESPACE} --tail=50"
         echo "    kubectl logs sts/${VALIDATOR_RELEASE} -n ${NAMESPACE} --tail=50"
         echo "    kubectl get pods -n ${NAMESPACE}"
+        echo "    kubectl get ingress -n ${NAMESPACE}"
         return 1
     fi
 }
@@ -294,19 +280,22 @@ cmd_teardown() {
     echo "=== Teardown Ethereum EL-CL-VC ==="
     echo ""
 
-    echo "[1/5] Uninstalling lighthouse-validator (${VALIDATOR_RELEASE})..."
+    echo "[1/6] Uninstalling lighthouse-validator (${VALIDATOR_RELEASE})..."
     helm uninstall "${VALIDATOR_RELEASE}" --namespace "${NAMESPACE}" 2>/dev/null || echo "  (not found, skipping)"
 
-    echo "[2/5] Uninstalling lighthouse (${LIGHTHOUSE_RELEASE})..."
+    echo "[2/6] Uninstalling lighthouse (${LIGHTHOUSE_RELEASE})..."
     helm uninstall "${LIGHTHOUSE_RELEASE}" --namespace "${NAMESPACE}" 2>/dev/null || echo "  (not found, skipping)"
 
-    echo "[3/5] Uninstalling geth (${GETH_RELEASE})..."
+    echo "[3/6] Uninstalling geth (${GETH_RELEASE})..."
     helm uninstall "${GETH_RELEASE}" --namespace "${NAMESPACE}" 2>/dev/null || echo "  (not found, skipping)"
 
-    echo "[4/5] Uninstalling genesis-generator (${GENESIS_RELEASE})..."
+    echo "[4/6] Uninstalling genesis-generator (${GENESIS_RELEASE})..."
     helm uninstall "${GENESIS_RELEASE}" --namespace "${NAMESPACE}" 2>/dev/null || echo "  (not found, skipping)"
 
-    echo "[5/5] Deleting namespace (${NAMESPACE})..."
+    echo "[5/6] Deleting PVCs (StatefulSet data)..."
+    kubectl delete pvc --all --namespace "${NAMESPACE}" 2>/dev/null || echo "  (not found, skipping)"
+
+    echo "[6/6] Deleting namespace (${NAMESPACE})..."
     kubectl delete namespace "${NAMESPACE}" --wait=false 2>/dev/null || echo "  (not found, skipping)"
 
     echo ""

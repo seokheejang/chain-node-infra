@@ -4,11 +4,17 @@ replicaCount: 1
 
 config:
   network: private
-  networkId: 32382
+  networkId: "3238200"
   syncMode: full
   cache: 256
   maxPeers: 0
   dataDir: /data/geth
+  httpApi: "eth,net,web3,debug,txpool,admin"
+  wsApi: "eth,net,web3,debug,txpool"
+  httpCorsDomain: "*"
+  extraArgs:
+    - --rpc.txfeecap=0
+    - --rpc.evmtimeout=0
 
 genesis:
   enabled: true
@@ -29,6 +35,13 @@ resources:
   limits:
     cpu: 500m
     memory: 512Mi
+
+ingress:
+  type: ingress
+  hostnames:
+    - geth-rpc.127.0.0.1.nip.io
+  ingress:
+    className: nginx
 
 livenessProbe:
   enabled: true

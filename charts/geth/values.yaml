@@ -5,7 +5,7 @@ image:
   # -- Container image repository
   repository: ethereum/client-go
   # -- Container image tag
-  tag: "v1.14.12"
+  tag: "v1.17.2"
   # -- Image pull policy
   pullPolicy: IfNotPresent
 
@@ -47,13 +47,7 @@ persistence:
   # -- Access modes
   accessModes:
     - ReadWriteOnce
-  # -- Volume size (immutable after PVC creation, provision generously)
-  # Recommended sizes by network and gcMode:
-  #   Mainnet pruned:  600Gi   |  Mainnet archive:  3Ti
-  #   Sepolia pruned:  200Gi   |  Sepolia archive:  800Gi
-  #   Holesky pruned:  150Gi   |  Holesky archive:  600Gi
-  #   Private:          50Gi   |  (any mode)
-  # Note: geth v1.14+ with PebbleDB + path scheme significantly reduced pruned storage
+  # -- Volume size
   size: 100Gi
   # -- Annotations for the PVC
   annotations: {}
@@ -94,7 +88,7 @@ config:
   # -- Ethereum network (mainnet, sepolia, holesky, private)
   # When set to "private", the --networkid flag is used instead of --<network>
   network: mainnet
-  # -- Custom network ID for private networks (e.g., 32382)
+  # -- Custom network ID for private networks (e.g., 3238200)
   # Only used when config.network is "private"
   networkId: ""
   # -- Sync mode (snap, full, light)
@@ -111,6 +105,12 @@ config:
   maxPeers: 50
   # -- Bootnode enode URLs for private network peer discovery
   bootnodes: []
+  # -- HTTP-RPC API namespaces to expose
+  httpApi: "eth,net,web3"
+  # -- WebSocket API namespaces to expose
+  wsApi: "eth,net,web3"
+  # -- HTTP CORS domains (* = allow all, needed for browser/wallet access)
+  httpCorsDomain: ""
   # -- Additional CLI arguments
   extraArgs: []
 

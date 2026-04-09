@@ -17,6 +17,7 @@ E2E_DIR="${REPO_ROOT}/e2e"
 CLUSTER_NAME="chain-node-e2e"
 ARGOCD_CHART_VERSION="9.4.17"
 ARGOCD_NAMESPACE="argocd"
+INGRESS_NGINX_NAMESPACE="ingress-nginx"
 E2E_KUBECONFIG="${E2E_DIR}/.kubeconfig"
 ADMIN_PASSWORD="${ARGOCD_ADMIN_PASSWORD:-admin}"
 
@@ -77,24 +78,40 @@ cmd_setup() {
 
     # --- Kind cluster ---
     if kind get clusters 2>/dev/null | grep -q "^${CLUSTER_NAME}$"; then
-        echo "[1/5] Kind cluster '${CLUSTER_NAME}' already exists. Skipping."
+        echo "[1/6] Kind cluster '${CLUSTER_NAME}' already exists. Skipping."
         kind get kubeconfig --name "${CLUSTER_NAME}" > "${E2E_KUBECONFIG}"
     else
-        echo "[1/5] Creating Kind cluster '${CLUSTER_NAME}'..."
+        echo "[1/6] Creating Kind cluster '${CLUSTER_NAME}'..."
         kind create cluster \
             --name "${CLUSTER_NAME}" \
             --config "${E2E_DIR}/kind/cluster.yaml" \
             --kubeconfig "${E2E_KUBECONFIG}" \
             --wait 60s
     fi
-    echo "[1/5] Done."
+    echo "[1/6] Done."
+
+    # --- nginx-ingress ---
+    echo "[2/6] Installing nginx-ingress controller..."
+    helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx 2>/dev/null || true
+    helm repo update ingress-nginx
+    helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+        --namespace "${INGRESS_NGINX_NAMESPACE}" \
+        --create-namespace \
+        --set controller.hostPort.enabled=true \
+        --set controller.service.type=NodePort \
+        --set-string controller.nodeSelector."ingress-ready"="true" \
+        --set controller.tolerations[0].key="" \
+        --set controller.tolerations[0].operator=Exists \
+        --timeout 5m \
+        --wait
+    echo "[2/6] Done."
 
     # --- ArgoCD ---
-    echo "[2/5] Adding Helm repo..."
+    echo "[3/6] Adding Helm repo..."
     helm repo add argo https://argoproj.github.io/argo-helm 2>/dev/null || true
     helm repo update argo
 
-    echo "[3/5] Installing ArgoCD (chart ${ARGOCD_CHART_VERSION})..."
+    echo "[4/6] Installing ArgoCD (chart ${ARGOCD_CHART_VERSION})..."
     BCRYPT_HASH=$(htpasswd -nbBC 10 "" "${ADMIN_PASSWORD}" | cut -d: -f2)
     helm upgrade --install argocd argo/argo-cd \
         --version "${ARGOCD_CHART_VERSION}" \
@@ -104,18 +121,18 @@ cmd_setup() {
         --set "configs.secret.argocdServerAdminPassword=${BCRYPT_HASH}" \
         --timeout 10m \
         --wait
-    echo "[3/5] Done."
+    echo "[4/6] Done."
 
-    echo "[4/5] Waiting for all pods to be ready..."
+    echo "[5/6] Waiting for all pods to be ready..."
     kubectl wait --for=condition=Ready pods \
         --field-selector=status.phase=Running \
         -n "${ARGOCD_NAMESPACE}" \
         --timeout=300s
-    echo "[4/5] Done."
+    echo "[5/6] Done."
 
-    echo "[5/5] Cleaning up..."
+    echo "[6/6] Cleaning up..."
     kubectl delete secret argocd-initial-admin-secret -n "${ARGOCD_NAMESPACE}" 2>/dev/null || true
-    echo "[5/5] Done."
+    echo "[6/6] Done."
 
     # Verify
     echo ""
@@ -158,6 +175,12 @@ cmd_verify() {
     check "Kind cluster exists" "kind get clusters 2>/dev/null | grep -q '^${CLUSTER_NAME}$'"
     check "Kubeconfig valid" "kubectl cluster-info"
     check "Nodes ready" "kubectl wait --for=condition=Ready nodes --all --timeout=10s"
+
+    # Ingress
+    echo ""
+    echo "Ingress:"
+    check "Namespace exists" "kubectl get namespace ${INGRESS_NGINX_NAMESPACE}"
+    check "Controller running" "kubectl get deploy ingress-nginx-controller -n ${INGRESS_NGINX_NAMESPACE} -o jsonpath='{.status.readyReplicas}' | grep -q '1'"
 
     # ArgoCD
     echo ""

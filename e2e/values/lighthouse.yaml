@@ -31,6 +31,13 @@ resources:
     cpu: 500m
     memory: 512Mi
 
+ingress:
+  type: ingress
+  hostnames:
+    - lighthouse-api.127.0.0.1.nip.io
+  ingress:
+    className: nginx
+
 livenessProbe:
   enabled: true
   initialDelaySeconds: 30

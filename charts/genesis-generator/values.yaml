@@ -13,8 +13,15 @@ serverPort: 8000
 # The image's built-in CL config.yaml template uses envsubst to substitute these values.
 # See all available vars: https://github.com/ethpandaops/ethereum-genesis-generator
 chainConfig:
-  CHAIN_ID: "32382"
+  CHAIN_ID: "3238200"
   DEPOSIT_CONTRACT_ADDRESS: "0x4242424242424242424242424242424242424242"
+  # -- Shared mnemonic for EL premine and CL validators (must match mnemonics[0].mnemonic)
+  EL_AND_CL_MNEMONIC: "test test test test test test test test test test test junk"
+  # -- Number of EOA addresses to derive from mnemonic via BIP-44 (m/44'/60'/0'/0/x)
+  EL_PREMINE_COUNT: "30"
+  # -- Balance per premined EOA account
+  EL_PREMINE_BALANCE: "1000000000ETH"
+  # -- Additional static premine addresses (JSON). Empty when using mnemonic-based premine.
   EL_PREMINE_ADDRS: '{}'
   PRESET_BASE: "mainnet"
   NUMBER_OF_VALIDATORS: "1"
@@ -26,11 +33,15 @@ chainConfig:
   ALTAIR_FORK_EPOCH: "0"
   BELLATRIX_FORK_EPOCH: "0"
   CAPELLA_FORK_EPOCH: "0"
+  # -- EL gas limit per block
+  GENESIS_GASLIMIT: "60000000"
+  # -- Terminal total difficulty (0 = PoS from genesis)
+  TERMINAL_TOTAL_DIFFICULTY: "0"
   DENEB_FORK_EPOCH: "0"
-  ELECTRA_FORK_EPOCH: "18446744073709551615"
+  ELECTRA_FORK_EPOCH: "0"
   FULU_FORK_EPOCH: "18446744073709551615"
 
-# -- Validator mnemonics for genesis generation
+# -- Validator mnemonics for genesis generation (must match chainConfig.EL_AND_CL_MNEMONIC)
 mnemonics:
   - mnemonic: "test test test test test test test test test test test junk"
     count: 1

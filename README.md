@@ -4,20 +4,33 @@ Helm charts and ArgoCD manifests for managing blockchain node infrastructure on 
 
 ## Overview
 
-This repository provides a GitOps-based approach to deploying and managing blockchain RPC nodes on Kubernetes using ArgoCD and Helm.
+This repository provides a GitOps-based approach to deploying and managing blockchain RPC nodes on Kubernetes using ArgoCD and Helm. It includes a complete Ethereum private devnet stack (EL + CL + Validator + Genesis) for contract development.
 
 ## Repository Structure
 
 ```
 chain-node-infra/
-├── charts/                  # Helm charts
-│   ├── common/              # Shared library chart (naming, labels)
-│   └── geth/                # Ethereum execution layer (go-ethereum)
-├── argocd/                  # ArgoCD Application manifests
-│   └── applications/        # Per-deployment Application specs
-├── scripts/                 # CI/CD helper scripts
-├── docs/                    # Operation guides & architecture
-└── .github/workflows/       # GitHub Actions (lint, release)
+├── charts/                       # Helm charts
+│   ├── common/                   # Shared library chart (naming, labels)
+│   ├── genesis-generator/        # Ethereum genesis generator (ethpandaops)
+│   ├── geth/                     # Execution layer (go-ethereum v1.17.2)
+│   ├── lighthouse/               # Consensus layer (sigp/lighthouse v8.1.3)
+│   └── lighthouse-validator/     # Validator client
+├── environments/                 # Per-environment value overrides
+│   ├── mainnet/
+│   ├── testnet/sepolia/
+│   └── private/                  # Private devnet (Pectra-enabled)
+├── argocd/                       # ArgoCD Application manifests
+│   └── applications/             # Per-deployment Application specs
+├── e2e/                          # End-to-end test infrastructure
+│   ├── kind/cluster.yaml         # Kind cluster config (with nginx-ingress)
+│   ├── scripts/                  # cluster.sh, ethereum.sh
+│   └── values/                   # E2E test values
+├── scripts/                      # CI/CD helper scripts
+├── docs/                         # Operation guides & architecture
+│   ├── archive/                  # Completed task documents
+│   └── learnings/                # Patterns, gotchas, decisions
+└── .github/workflows/            # GitHub Actions (lint, release)
 ```
 
 ## Quick Start
@@ -73,12 +86,61 @@ helm install my-geth charts/geth -n ethereum --create-namespace
 
 ### Deploy via ArgoCD
 
-See [docs/task-01-argocd-installation.md](docs/task-01-argocd-installation.md) for ArgoCD setup instructions.
+See [docs/archive/task-01-argocd-installation.md](docs/archive/task-01-argocd-installation.md) for ArgoCD setup instructions.
 
 ```bash
 # Ensure ArgoCD is installed and .envrc is loaded
 kubectl apply -f argocd/applications/geth.yaml
 ```
+
+## Private Devnet (Local Development)
+
+Run a complete Ethereum devnet (EL + CL + Validator) on a local Kind cluster, accessible via nginx-ingress.
+
+### Features
+
+- **Latest hardforks**: Pectra (Electra) enabled at genesis
+- **30 prefunded EOAs**: derived from the standard test mnemonic — see [docs/eth-devnet-premine-accounts.md](docs/eth-devnet-premine-accounts.md)
+- **MetaMask/Foundry/Hardhat ready**: CORS enabled, full RPC API namespaces (`eth, net, web3, debug, txpool, admin`)
+- **Mainnet-parity**: same gas limit (60M), same opcodes, same precompiles
+- **Chain ID**: `3238200`
+
+### Quick Start
+
+```bash
+# 1. Create Kind cluster + ArgoCD + nginx-ingress
+e2e/scripts/cluster.sh setup
+
+# 2. Deploy Ethereum stack (genesis-generator → geth → lighthouse → validator)
+e2e/scripts/ethereum.sh deploy
+
+# 3. Access via ingress
+curl -X POST -H 'Content-Type: application/json' \
+  --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
+  http://geth-rpc.127.0.0.1.nip.io
+
+# 4. Teardown (also deletes PVCs)
+e2e/scripts/ethereum.sh teardown
+```
+
+### Endpoints
+
+| Service | URL |
+|---------|-----|
+| Geth RPC (HTTP) | `http://geth-rpc.127.0.0.1.nip.io` |
+| Lighthouse Beacon API | `http://lighthouse-api.127.0.0.1.nip.io` |
+| ArgoCD UI | `http://localhost:8080` |
+
+### Importing a Test Account
+
+```bash
+# First account (Hardhat/Foundry standard)
+Address:     0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+Private key: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+Balance:     1,000,000,000 ETH
+```
+
+See [docs/eth-devnet-premine-accounts.md](docs/eth-devnet-premine-accounts.md) for all 30 accounts.
 
 ## Adding a New Chart
 
