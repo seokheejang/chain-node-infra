@@ -1,0 +1,32 @@
+# Mainnet values for lighthouse
+replicaCount: 1
+
+config:
+  network: mainnet
+  executionEndpoint: "http://geth:8551"
+  archiveMode: false    # true for full historic beacon state reconstruction
+  slotsPerRestorePoint: 8192  # 2048 for archive mode
+
+persistence:
+  enabled: true
+  size: 300Gi     # Increase to 500Gi for archive mode
+
+resources:
+  requests:
+    cpu: "2"
+    memory: 4Gi
+  limits:
+    cpu: "4"
+    memory: 8Gi
+
+metrics:
+  enabled: true
+
+# Baremetal ingress example (nip.io convention)
+# Replace 192.168.1.100 with your node's external IP
+# ingress:
+#   type: ingress
+#   hostnames:
+#     - lighthouse-api.192.168.1.100.nip.io
+#   ingress:
+#     className: nginx

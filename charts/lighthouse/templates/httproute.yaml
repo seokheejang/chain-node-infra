@@ -11,14 +11,30 @@ spec:
       namespace: {{ .Values.ingress.httpRoute.gatewayNamespace }}
   hostnames:
     {{- range .Values.ingress.hostnames }}
+    {{- if kindIs "string" . }}
     - {{ . | quote }}
+    {{- else }}
+    - {{ .hostname | quote }}
+    {{- end }}
     {{- end }}
   rules:
+    {{- range .Values.ingress.hostnames }}
+    {{- if kindIs "string" . }}
     - matches:
         - path:
-            type: {{ .Values.ingress.httpRoute.pathType }}
-            value: {{ .Values.ingress.httpRoute.path }}
+            type: {{ $.Values.ingress.httpRoute.pathType }}
+            value: {{ $.Values.ingress.httpRoute.path }}
       backendRefs:
-        - name: {{ include "lighthouse.fullname" . }}
-          port: {{ .Values.service.ports.http }}
+        - name: {{ include "lighthouse.fullname" $ }}
+          port: {{ $.Values.service.ports.http }}
+    {{- else }}
+    - matches:
+        - path:
+            type: {{ $.Values.ingress.httpRoute.pathType }}
+            value: {{ $.Values.ingress.httpRoute.path }}
+      backendRefs:
+        - name: {{ include "lighthouse.fullname" $ }}
+          port: {{ index $.Values.service.ports .port }}
+    {{- end }}
+    {{- end }}
 {{- end }}

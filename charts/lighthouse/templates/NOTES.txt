@@ -3,6 +3,18 @@ Lighthouse has been deployed!
   Chart: {{ .Chart.Name }}-{{ .Chart.Version }}
   Network: {{ .Values.config.network }}
   Execution Endpoint: {{ .Values.config.executionEndpoint }}
+  Archive Mode: {{ .Values.config.archiveMode }}
+
+{{- if ne .Values.ingress.type "none" }}
+External endpoints:
+  {{- range .Values.ingress.hostnames }}
+  {{- if kindIs "string" . }}
+  http://{{ . }} (http)
+  {{- else }}
+  http://{{ .hostname }} ({{ .port }})
+  {{- end }}
+  {{- end }}
+{{- end }}
 
 Access the Beacon API:
 

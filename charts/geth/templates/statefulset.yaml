@@ -86,6 +86,12 @@ spec:
             - --networkid={{ .Values.config.networkId }}
             {{- end }}
             - --syncmode={{ .Values.config.syncMode }}
+            - --gcmode={{ .Values.config.gcMode }}
+            {{- if eq .Values.config.gcMode "archive" }}
+            - --state.scheme=hash
+            {{- else }}
+            - --state.scheme=path
+            {{- end }}
             - --datadir={{ .Values.config.dataDir }}
             - --cache={{ .Values.config.cache }}
             - --maxpeers={{ .Values.config.maxPeers }}

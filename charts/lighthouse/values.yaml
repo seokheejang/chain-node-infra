@@ -43,7 +43,12 @@ persistence:
   # -- Access modes
   accessModes:
     - ReadWriteOnce
-  # -- Volume size
+  # -- Volume size (immutable after PVC creation, provision generously)
+  # Recommended sizes by network and archiveMode:
+  #   Mainnet pruned:  300Gi   |  Mainnet archive:  500Gi
+  #   Sepolia pruned:  100Gi   |  Sepolia archive:  200Gi
+  #   Holesky pruned:   80Gi   |  Holesky archive:  150Gi
+  #   Private:          20Gi   |  (any mode)
   size: 50Gi
   # -- Annotations for the PVC
   annotations: {}
@@ -88,7 +93,12 @@ config:
   dataDir: /data/lighthouse
   # -- Execution layer Engine API endpoint URL
   executionEndpoint: "http://geth:8551"
-  # -- Number of slots per restore point (controls disk usage)
+  # -- Enable archive mode (reconstruct all historic beacon states)
+  # When true: adds --reconstruct-historic-states and recommends slotsPerRestorePoint: 2048
+  # When false: standard pruned mode
+  archiveMode: false
+  # -- Number of slots per restore point (controls disk usage and state lookup speed)
+  # Recommended: 8192 for pruned, 2048 for archive
   slotsPerRestorePoint: 8192
   # -- Additional CLI arguments
   extraArgs: []
@@ -157,6 +167,13 @@ ingress:
   # -- Ingress type: "none", "ingress", or "httpRoute"
   type: none
   # -- Hostnames for ingress/httpRoute
+  # Baremetal nip.io convention:
+  #   hostnames:
+  #     - lighthouse-api.192.168.1.100.nip.io
+  # Structured form (for consistency with geth chart):
+  #   hostnames:
+  #     - hostname: lighthouse-api.192.168.1.100.nip.io
+  #       port: http
   hostnames: []
   # -- Traditional Kubernetes Ingress configuration
   ingress:

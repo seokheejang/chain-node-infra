@@ -75,6 +75,9 @@ spec:
             - --http-allow-origin=*
             - --port={{ .Values.service.ports.p2pTcp }}
             - --slots-per-restore-point={{ .Values.config.slotsPerRestorePoint }}
+            {{- if .Values.config.archiveMode }}
+            - --reconstruct-historic-states
+            {{- end }}
             {{- if .Values.metrics.enabled }}
             - --metrics
             - --metrics-address=0.0.0.0

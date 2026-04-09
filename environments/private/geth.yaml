@@ -6,6 +6,7 @@ config:
   network: private
   networkId: 32382
   syncMode: full
+  gcMode: full
   cache: 512
   maxPeers: 10
 

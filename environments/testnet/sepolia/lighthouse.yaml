@@ -1,0 +1,32 @@
+# Sepolia testnet values for lighthouse
+replicaCount: 1
+
+config:
+  network: sepolia
+  executionEndpoint: "http://geth:8551"
+  archiveMode: false    # true for full historic beacon state reconstruction
+  slotsPerRestorePoint: 8192  # 2048 for archive mode
+
+persistence:
+  enabled: true
+  size: 100Gi     # Increase to 200Gi for archive mode
+
+resources:
+  requests:
+    cpu: "1"
+    memory: 2Gi
+  limits:
+    cpu: "2"
+    memory: 4Gi
+
+metrics:
+  enabled: true
+
+# Baremetal ingress example (nip.io convention)
+# Replace 192.168.1.100 with your node's external IP
+# ingress:
+#   type: ingress
+#   hostnames:
+#     - lighthouse-api-sepolia.192.168.1.100.nip.io
+#   ingress:
+#     className: nginx

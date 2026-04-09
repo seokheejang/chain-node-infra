@@ -4,11 +4,24 @@ replicaCount: 1
 config:
   network: mainnet
   syncMode: snap
+  gcMode: full    # "archive" for full historical state (~3Ti disk)
   cache: 4096
 
 persistence:
   enabled: true
-  size: 500Gi
+  size: 600Gi     # Increase to 3Ti for archive mode
+
+# Baremetal ingress example (nip.io convention)
+# Replace 192.168.1.100 with your node's external IP
+# ingress:
+#   type: ingress
+#   hostnames:
+#     - hostname: geth-rpc.192.168.1.100.nip.io
+#       port: rpc
+#     - hostname: geth-ws.192.168.1.100.nip.io
+#       port: ws
+#   ingress:
+#     className: nginx
 
 resources:
   requests:

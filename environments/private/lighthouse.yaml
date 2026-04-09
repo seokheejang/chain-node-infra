@@ -6,6 +6,7 @@ config:
   network: private
   dataDir: /data/lighthouse
   executionEndpoint: "http://geth-private:8551"
+  archiveMode: false
 
 testnetDir:
   enabled: true

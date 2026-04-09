@@ -47,7 +47,13 @@ persistence:
   # -- Access modes
   accessModes:
     - ReadWriteOnce
-  # -- Volume size
+  # -- Volume size (immutable after PVC creation, provision generously)
+  # Recommended sizes by network and gcMode:
+  #   Mainnet pruned:  600Gi   |  Mainnet archive:  3Ti
+  #   Sepolia pruned:  200Gi   |  Sepolia archive:  800Gi
+  #   Holesky pruned:  150Gi   |  Holesky archive:  600Gi
+  #   Private:          50Gi   |  (any mode)
+  # Note: geth v1.14+ with PebbleDB + path scheme significantly reduced pruned storage
   size: 100Gi
   # -- Annotations for the PVC
   annotations: {}
@@ -93,6 +99,10 @@ config:
   networkId: ""
   # -- Sync mode (snap, full, light)
   syncMode: snap
+  # -- Garbage collection mode
+  # "full" (default): pruned mode with path-based state scheme (smaller disk)
+  # "archive": archive mode with hash-based state scheme (full historical state, larger disk)
+  gcMode: full
   # -- Data directory inside the container
   dataDir: /data/geth
   # -- Database cache size in MB
@@ -157,6 +167,15 @@ ingress:
   # -- Ingress type: "none", "ingress", or "httpRoute"
   type: none
   # -- Hostnames for ingress/httpRoute
+  # Simple form (routes to RPC port):
+  #   hostnames:
+  #     - geth-rpc.192.168.1.100.nip.io
+  # Structured form (per-port routing, baremetal nip.io convention):
+  #   hostnames:
+  #     - hostname: geth-rpc.192.168.1.100.nip.io
+  #       port: rpc
+  #     - hostname: geth-ws.192.168.1.100.nip.io
+  #       port: ws
   hostnames: []
   # -- Traditional Kubernetes Ingress configuration
   ingress:

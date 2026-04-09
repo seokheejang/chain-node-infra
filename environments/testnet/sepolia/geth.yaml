@@ -1,0 +1,35 @@
+# Sepolia testnet values for geth
+replicaCount: 1
+
+config:
+  network: sepolia
+  syncMode: snap
+  gcMode: full    # "archive" for full historical state (~800Gi disk)
+  cache: 2048
+
+persistence:
+  enabled: true
+  size: 200Gi     # Increase to 800Gi for archive mode
+
+resources:
+  requests:
+    cpu: "1"
+    memory: 4Gi
+  limits:
+    cpu: "2"
+    memory: 8Gi
+
+metrics:
+  enabled: true
+
+# Baremetal ingress example (nip.io convention)
+# Replace 192.168.1.100 with your node's external IP
+# ingress:
+#   type: ingress
+#   hostnames:
+#     - hostname: geth-rpc-sepolia.192.168.1.100.nip.io
+#       port: rpc
+#     - hostname: geth-ws-sepolia.192.168.1.100.nip.io
+#       port: ws
+#   ingress:
+#     className: nginx

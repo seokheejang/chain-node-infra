@@ -3,10 +3,27 @@ Geth has been deployed!
   Chart: {{ .Chart.Name }}-{{ .Chart.Version }}
   Network: {{ .Values.config.network }}
   Sync Mode: {{ .Values.config.syncMode }}
+  GC Mode: {{ .Values.config.gcMode }}
+  {{- if eq .Values.config.gcMode "archive" }}
+  State Scheme: hash (archive)
+  {{- else }}
+  State Scheme: path (pruned)
+  {{- end }}
 {{- if eq .Values.config.network "private" }}
   Network ID: {{ .Values.config.networkId }}
   {{- if .Values.genesis.enabled }}
   Genesis: Initialized via ConfigMap
+  {{- end }}
+{{- end }}
+
+{{- if ne .Values.ingress.type "none" }}
+External endpoints:
+  {{- range .Values.ingress.hostnames }}
+  {{- if kindIs "string" . }}
+  http://{{ . }} (rpc)
+  {{- else }}
+  http://{{ .hostname }} ({{ .port }})
+  {{- end }}
   {{- end }}
 {{- end }}
 
