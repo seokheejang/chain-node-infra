@@ -47,10 +47,16 @@ jobs:
           fi
           echo "OK: $chart_name @ $chart_version"
 
+      # Use docker/login-action so credentials land in ~/.docker/config.json,
+      # which BOTH helm v3 (OCI fallback) and cosign read. `helm registry login`
+      # alone writes to a helm-private store that cosign cannot see, causing
+      # signature upload to fail with UNAUTHORIZED.
       - name: Log in to GHCR
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" \
-            | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Package, push and sign charts
         env:

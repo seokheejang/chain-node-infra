@@ -2,7 +2,7 @@ apiVersion: v2
 name: geth
 description: Helm chart for deploying go-ethereum (geth) execution layer RPC nodes on Kubernetes
 type: application
-version: 0.1.1
+version: 0.1.2
 appVersion: "1.14.12"
 annotations:
   org.opencontainers.image.source: https://github.com/seokheejang/chain-node-infra

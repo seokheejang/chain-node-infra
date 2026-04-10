@@ -114,9 +114,9 @@ oci://ghcr.io/seokheejang/chain-node-infra/genesis-generator
 oci://ghcr.io/seokheejang/chain-node-infra/common               # library, dependency only
 ```
 
-### Verify before install (recommended, for `0.1.1+`)
+### Verify before install (recommended, for `geth 0.1.2+`)
 
-Charts published from version `0.1.1` onwards are signed with [Sigstore Cosign](https://www.sigstore.dev/) using GitHub Actions OIDC (keyless). No public key distribution — verification ties the artifact to this exact workflow via Sigstore Fulcio + Rekor transparency log.
+Charts published from `geth 0.1.2` onwards are signed with [Sigstore Cosign](https://www.sigstore.dev/) using GitHub Actions OIDC (keyless). No public key distribution — verification ties the artifact to this exact workflow via Sigstore Fulcio + Rekor transparency log.
 
 ```bash
 # Install cosign: https://docs.sigstore.dev/cosign/installation/
@@ -124,7 +124,7 @@ brew install cosign         # macOS
 # or: go install github.com/sigstore/cosign/v2/cmd/cosign@latest
 
 # Verify chart signature before pulling (example: geth)
-cosign verify ghcr.io/seokheejang/chain-node-infra/geth:0.1.1 \
+cosign verify ghcr.io/seokheejang/chain-node-infra/geth:0.1.2 \
   --certificate-identity-regexp '^https://github\.com/seokheejang/chain-node-infra/\.github/workflows/release\.yaml@refs/tags/geth-.*$' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
@@ -133,7 +133,7 @@ The `certificate-identity-regexp` pins the signature to **this repo + this workf
 
 For automated enforcement in production clusters, use [Kyverno](https://kyverno.io/) or [Connaisseur](https://github.com/sse-secure-systems/connaisseur) admission policies that reject unsigned (or untrusted-identity) chart installs.
 
-> **Note**: Charts published before `0.1.1` (the original `0.1.0` release) are unsigned. Verification will fail for those — this is expected. Bump to a signed version when consuming.
+> **Note**: `geth 0.1.0` and `0.1.1`, and all other charts at `0.1.0`, are unsigned (published before the cosign workflow fix). Verification will fail for those — this is expected. Subsequent releases will be signed.
 
 ### Pattern 1: helm CLI (any consumer)
 

@@ -8,8 +8,9 @@
   - `helm push` 출력에서 digest 파싱 → `cosign sign --yes <chart>@<digest>` (immutable digest 기반)
   - 관리할 키 없음: 검증 trust는 workflow identity(`release.yaml@refs/tags/<chart>-*`)에 anchored
 - README: "Verify before install" 섹션 추가 — `cosign verify` 명령어 + `certificate-identity-regexp` 패턴 + Kyverno/Connaisseur 포인터
-- 적용 범위: `0.1.1` 이후 publish되는 chart만 서명 (0.1.0은 task-07 이전이라 unsigned, 재서명은 immutability 저해)
-- 검증: `geth-0.1.1` 태그로 end-to-end — Fulcio 인증서 발급, Rekor entry, `cosign verify` OK, negative test(잘못된 identity regex / unsigned 0.1.0) fail 확인
+- login: `helm registry login` → `docker/login-action@v3` 교체 — helm 전용 credential store는 cosign이 못 읽어 서명 push가 UNAUTHORIZED로 실패. docker login이 쓰는 `~/.docker/config.json`은 helm v3 OCI + cosign 둘 다 fallback으로 읽음
+- 적용 범위: `geth 0.1.2` 이후 서명 (0.1.0과 0.1.1은 unsigned — 0.1.1은 위 auth 이슈로 서명 실패한 상태로 publish됨, OCI immutable이라 사후 서명 불가)
+- 검증: `geth-0.1.2` 태그로 end-to-end — Fulcio 인증서 발급, Rekor entry, `cosign verify` OK, negative test(잘못된 identity regex / unsigned 0.1.0) fail 확인
 - 비목표(분리): SLSA provenance attestation → task-08, admission webhook 셋업은 consumer 측 작업
 
 ## v0.5 -- GHCR(OCI) Helm Chart Publishing (2026-04-09)
