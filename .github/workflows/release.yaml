@@ -19,12 +19,16 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       packages: write           # GHCR push
+      id-token: write           # Sigstore OIDC keyless signing (Cosign)
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Helm
         uses: azure/setup-helm@v4
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
 
       - name: Validate tag matches Chart.yaml version
         run: |
@@ -48,9 +52,10 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" \
             | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Package and push charts to GHCR
+      - name: Package, push and sign charts
         env:
           OCI_REPO: oci://ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
+          OCI_REPO_BARE: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
         run: |
           set -euo pipefail
           mkdir -p .release-packages
@@ -70,6 +75,20 @@ jobs:
               echo "skip: ${chart_name}@${version} already published"
               continue
             fi
-            echo "push: ${chart_name}@${version}"
-            helm push "$tgz" "$OCI_REPO"
+            echo "::group::push+sign ${chart_name}@${version}"
+            # Capture push output to extract immutable digest for signing.
+            # helm push writes "Pushed: ..." and "Digest: sha256:..." to stderr.
+            helm push "$tgz" "$OCI_REPO" 2>&1 | tee push-output.txt
+            digest=$(awk '/Digest: /{print $2}' push-output.txt)
+            if [ -z "$digest" ]; then
+              echo "ERROR: failed to parse digest from helm push output"
+              cat push-output.txt
+              exit 1
+            fi
+            # Cosign keyless signing via GitHub Actions OIDC.
+            # No keys to manage - identity is the workflow itself.
+            echo "Signing ${OCI_REPO_BARE}/${chart_name}@${digest}"
+            cosign sign --yes "${OCI_REPO_BARE}/${chart_name}@${digest}"
+            rm -f push-output.txt
+            echo "::endgroup::"
           done

@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## v0.6 -- Cosign Keyless Signing for GHCR Charts (2026-04-10)
+
+- [task-07-cosign-signing.md](task-07-cosign-signing.md) 작업 문서
+- release workflow: Sigstore Cosign keyless signing 통합 (GitHub Actions OIDC + Fulcio + Rekor)
+  - `permissions: id-token: write` 추가, `sigstore/cosign-installer@v3` step 추가
+  - `helm push` 출력에서 digest 파싱 → `cosign sign --yes <chart>@<digest>` (immutable digest 기반)
+  - 관리할 키 없음: 검증 trust는 workflow identity(`release.yaml@refs/tags/<chart>-*`)에 anchored
+- README: "Verify before install" 섹션 추가 — `cosign verify` 명령어 + `certificate-identity-regexp` 패턴 + Kyverno/Connaisseur 포인터
+- 적용 범위: `0.1.1` 이후 publish되는 chart만 서명 (0.1.0은 task-07 이전이라 unsigned, 재서명은 immutability 저해)
+- 검증: `geth-0.1.1` 태그로 end-to-end — Fulcio 인증서 발급, Rekor entry, `cosign verify` OK, negative test(잘못된 identity regex / unsigned 0.1.0) fail 확인
+- 비목표(분리): SLSA provenance attestation → task-08, admission webhook 셋업은 consumer 측 작업
+
 ## v0.5 -- GHCR(OCI) Helm Chart Publishing (2026-04-09)
 
 - [task-06-ghcr-publishing.md](archive/task-06-ghcr-publishing.md) 작업 문서
