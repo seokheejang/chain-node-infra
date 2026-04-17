@@ -7,8 +7,14 @@ metadata:
 data:
   values.env: |
     {{- range $key, $value := .Values.chainConfig }}
-    {{- if eq $key "GENESIS_TIMESTAMP" }}
-    export GENESIS_TIMESTAMP={{ now | unixEpoch | quote }}
+    {{- /*
+    GENESIS_TIMESTAMP 는 values 에서 "0" 또는 "" 이면 deploy 시점 unix epoch 로
+    auto-set. 그 외의 값이 지정되면 그 값을 그대로 사용 — 이로써 GitOps
+    환경 (ArgoCD 등) 에서 매 render 마다 timestamp 가 바뀌어 drift 가 생기는
+    문제를 해결. deterministic / reproducible render 가능.
+    */}}
+    {{- if and (eq $key "GENESIS_TIMESTAMP") (or (eq ($value | toString) "") (eq ($value | toString) "0")) }}
+    export {{ $key }}={{ now | unixEpoch | quote }}
     {{- else }}
     export {{ $key }}={{ $value | quote }}
     {{- end }}
