@@ -183,7 +183,11 @@ spec:
       {{- end }}
   {{- if .Values.persistence.enabled }}
   volumeClaimTemplates:
-    - metadata:
+    # apiVersion/kind 명시 — k8s API 가 apply 시 이 값들을 자동 채우므로
+    # template 에도 박아두어 GitOps tool (ArgoCD/FluxCD) 의 drift detection 예방.
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
         name: data
         {{- with .Values.persistence.annotations }}
         annotations:
