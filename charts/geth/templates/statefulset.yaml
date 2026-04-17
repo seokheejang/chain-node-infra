@@ -50,10 +50,20 @@ spec:
             - |
               if [ ! -d {{ .Values.config.dataDir }}/geth/chaindata ]; then
                 echo "Initializing genesis..."
-                {{- if .Values.genesis.fromUrl }}
-                geth init --datadir {{ .Values.config.dataDir }} /genesis-download/genesis.json
+                {{- if eq .Values.config.gcMode "archive" }}
+                {{- /*
+                archive 모드는 --state.scheme=hash 를 main container 에서 쓰므로 init 에도
+                동일 scheme 을 명시해야 한다. 안 주면 geth 기본 (path) 로 DB 생성되어
+                main 기동 시 "incompatible state scheme, stored: path, provided: hash" Fatal.
+                */}}
+                INIT_FLAGS="--state.scheme=hash"
                 {{- else }}
-                geth init --datadir {{ .Values.config.dataDir }} /config/genesis.json
+                INIT_FLAGS="--state.scheme=path"
+                {{- end }}
+                {{- if .Values.genesis.fromUrl }}
+                geth init $INIT_FLAGS --datadir {{ .Values.config.dataDir }} /genesis-download/genesis.json
+                {{- else }}
+                geth init $INIT_FLAGS --datadir {{ .Values.config.dataDir }} /config/genesis.json
                 {{- end }}
               else
                 echo "Chain data already exists, skipping init."
