@@ -8,7 +8,7 @@
 - Phase A/B/C 모두 완료. `geth-0.1.2` 태그로 end-to-end 검증 통과.
 - **Positive**: `cosign verify ghcr.io/seokheejang/chain-node-infra/geth:0.1.2` → Subject=`release.yaml@refs/tags/geth-0.1.2`, Issuer=GitHub OIDC, Rekor logIndex `1271237772`.
 - **Negative**: 잘못된 identity regex, unsigned `geth:0.1.0`/`geth:0.1.1` 모두 정상 reject.
-- **예상치 못한 이슈** — 첫 시도(`geth-0.1.1`)가 서명 push 단계에서 401로 실패. 원인: `helm registry login`과 `cosign`이 서로 다른 credential store 사용. 해결: `docker/login-action@v3`으로 교체 (`~/.docker/config.json`을 helm v3 OCI fallback과 cosign이 공유). 상세: [docs/learnings/cosign-helm-registry-login-credential-store.md](learnings/cosign-helm-registry-login-credential-store.md).
+- **예상치 못한 이슈** — 첫 시도(`geth-0.1.1`)가 서명 push 단계에서 401로 실패. 원인: `helm registry login`과 `cosign`이 서로 다른 credential store 사용. 해결: `docker/login-action@v3`으로 교체 (`~/.docker/config.json`을 helm v3 OCI fallback과 cosign이 공유). 상세: [docs/learnings/cosign-helm-registry-login-credential-store.md](../learnings/cosign-helm-registry-login-credential-store.md).
 - **부작용**: `geth:0.1.1`이 unsigned orphan으로 GHCR에 영구히 남음 (OCI immutable). README에 "`geth 0.1.2+` signed"로 명시.
 
 ---

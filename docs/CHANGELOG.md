@@ -1,8 +1,17 @@
 # CHANGELOG
 
+## v0.7 -- Post-Release GitOps Drift & Correctness Fixes (2026-04-17)
+
+- [task-08-gitops-drift-fixes.md](archive/task-08-gitops-drift-fixes.md) 작업 문서
+- geth: `gcMode: archive` first boot Fatal 수정 — init container에도 `--state.scheme=hash` 를 명시해 main container와 scheme 일치. `full` 모드에서도 명시적으로 `--state.scheme=path` 넘김. Chart: `0.1.3 → 0.1.4`
+- charts: StatefulSet `volumeClaimTemplates` 3개(geth/lighthouse/genesis-generator)에 `apiVersion: v1` + `kind: PersistentVolumeClaim` 명시 — k8s API defaulting 값과 일치시켜 ArgoCD OutOfSync 루프 제거. 소비자 측 `ignoreDifferences` 워크어라운드 불필요. Chart: `geth 0.1.2→0.1.3`, `genesis-generator 0.1.0→0.1.1`, `lighthouse 0.1.0→0.1.1`
+- genesis-generator: `GENESIS_TIMESTAMP` 를 매 render마다 `now | unixEpoch` 로 덮어쓰던 동작을 sentinel(`""`/`"0"`) 경로로 제한. 명시값은 그대로 보존 → deterministic render, ArgoCD ConfigMap drift/롤링 재시작 루프 해소. Chart: `0.1.1 → 0.1.2`
+- 학습: [geth-gcmode-state-scheme.md](learnings/geth-gcmode-state-scheme.md) init/main scheme 쌍 일치 섹션 추가, [gitops-drift.md](learnings/gitops-drift.md) 신규 (volumeClaimTemplates defaulting, 비결정적 template)
+- 비목표(분리): 소비자 쪽 umbrella chart 버전 bump 및 `ignoreDifferences` 제거 — 소비자 repo 작업
+
 ## v0.6 -- Cosign Keyless Signing for GHCR Charts (2026-04-10)
 
-- [task-07-cosign-signing.md](task-07-cosign-signing.md) 작업 문서
+- [task-07-cosign-signing.md](archive/task-07-cosign-signing.md) 작업 문서
 - release workflow: Sigstore Cosign keyless signing 통합 (GitHub Actions OIDC + Fulcio + Rekor)
   - `permissions: id-token: write` 추가, `sigstore/cosign-installer@v3` step 추가
   - `helm push` 출력에서 digest 파싱 → `cosign sign --yes <chart>@<digest>` (immutable digest 기반)
